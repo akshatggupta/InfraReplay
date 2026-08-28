@@ -38,6 +38,11 @@ def _header(title: str) -> None:
         ui.label(title).classes("text-white")
 
 
+def _api_down(exc: Exception) -> None:
+    ui.label(f"API unreachable at {_API}").classes("text-red-600 text-lg")
+    ui.label(str(exc)).classes("text-gray-500 font-mono text-xs")
+
+
 # ------------------------------------------------------------ recordings list
 
 
@@ -51,7 +56,11 @@ async def index() -> None:
 
     ui.button("Seed demo data", on_click=seed).props("outline")
 
-    rows = await _get("/api/recordings")
+    try:
+        rows = await _get("/api/recordings")
+    except httpx.HTTPError as exc:
+        _api_down(exc)
+        return
 
     if not rows:
         ui.label("No recordings yet — click “Seed demo data”.").classes("text-gray-500")
@@ -117,7 +126,13 @@ def _event_label(e: dict) -> str:
 
 @ui.page("/recording/{recording_id}")
 async def recording_detail(recording_id: str) -> None:
-    rec = await _get(f"/api/recordings/{recording_id}")
+    try:
+        rec = await _get(f"/api/recordings/{recording_id}")
+    except httpx.HTTPError as exc:
+        _header(recording_id)
+        _api_down(exc)
+        return
+
     _header(rec["title"] or recording_id)
 
     with ui.row().classes("items-center gap-4"):
@@ -150,6 +165,9 @@ async def replay_comparison(replay_recording_id: str) -> None:
         results = await _get(f"/api/replays/{replay_recording_id}/comparison")
     except httpx.HTTPStatusError:
         ui.label("No comparison found for that replay.").classes("text-gray-500")
+        return
+    except httpx.HTTPError as exc:
+        _api_down(exc)
         return
 
     counts: dict[str, int] = {}
