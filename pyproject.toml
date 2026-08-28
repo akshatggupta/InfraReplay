@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "infrareplay"
+version = "0.1.0"
+description = "Record a real HTTP+PostgreSQL workflow, replay it anywhere, get an automatic diff."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "typer",
+    "pydantic>=2",
+    "sqlalchemy>=2.0",
+    "alembic",
+    "aiosqlite",
+    "asyncpg",
+    "httpx",
+    "nicegui",
+    "structlog",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-asyncio"]
+
+[project.scripts]
+infractl = "infrareplay.cli.main:app"
+
+# Built-in plugins are registered exactly like a third-party package would
+# register its own: through this entry-point group. The core never
+# special-cases them.
+[project.entry-points."infrareplay.plugins"]
+mock_capture = "infrareplay.plugins.mock_capture.plugin:MockCapturePlugin"
+storage_fs = "infrareplay.plugins.storage_fs.plugin:FilesystemStoragePlugin"
+redaction_default = "infrareplay.plugins.redaction_default.plugin:DefaultRedactionPlugin"
+http_comparator = "infrareplay.plugins.comparators.http:HttpComparator"
+postgres_comparator = "infrareplay.plugins.comparators.postgres:PostgresComparator"
+
+[tool.setuptools.packages.find]
+include = ["infrareplay*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
