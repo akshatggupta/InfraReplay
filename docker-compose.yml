@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: infrareplay
+      POSTGRES_PASSWORD: infrareplay
+      POSTGRES_DB: infrareplay
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infrareplay"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    command: uvicorn infrareplay.api.app:app --host 0.0.0.0 --port 8000
+    environment:
+      INFRAREPLAY_DATABASE_URL: postgresql+asyncpg://infrareplay:infrareplay@postgres:5432/infrareplay
+      INFRAREPLAY_BLOB_ROOT: /data/blobs
+    volumes:
+      - blobs:/data/blobs
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dashboard:
+    build: .
+    command: python -m infrareplay.dashboard.app
+    environment:
+      INFRAREPLAY_API_URL: http://api:8000
+      INFRAREPLAY_DASHBOARD_PORT: "8080"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
+
+volumes:
+  blobs:
