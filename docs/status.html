@@ -1,0 +1,685 @@
+<title>InfraReplay Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  /* ---- tokens : dark-first ---------------------------------------------- */
+  :root {
+    --ink: #0b0e14;
+    --panel: #131a25;
+    --panel-2: #0f1520;
+    --line: #253040;
+    --text: #e7ecf3;
+    --muted: #8a97a8;
+    --dim: #5c6a7d;
+    --signal: #3ce0c9;
+    --amber: #f2b45a;
+    --good: #57d98a;
+    --shadow: rgba(0, 0, 0, 0.45);
+    --grid: rgba(255, 255, 255, 0.03);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --ink: #f2f4f7;
+      --panel: #ffffff;
+      --panel-2: #eaeef3;
+      --line: #d6dce4;
+      --text: #131a22;
+      --muted: #56606e;
+      --dim: #8894a2;
+      --signal: #0c9c8a;
+      --amber: #b1701a;
+      --good: #1f9d57;
+      --shadow: rgba(20, 30, 45, 0.1);
+      --grid: rgba(20, 30, 45, 0.035);
+    }
+  }
+
+  :root[data-theme="light"] {
+    --ink: #f2f4f7;
+    --panel: #ffffff;
+    --panel-2: #eaeef3;
+    --line: #d6dce4;
+    --text: #131a22;
+    --muted: #56606e;
+    --dim: #8894a2;
+    --signal: #0c9c8a;
+    --amber: #b1701a;
+    --good: #1f9d57;
+    --shadow: rgba(20, 30, 45, 0.1);
+    --grid: rgba(20, 30, 45, 0.035);
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #0b0e14;
+    --panel: #131a25;
+    --panel-2: #0f1520;
+    --line: #253040;
+    --text: #e7ecf3;
+    --muted: #8a97a8;
+    --dim: #5c6a7d;
+    --signal: #3ce0c9;
+    --amber: #f2b45a;
+    --good: #57d98a;
+    --shadow: rgba(0, 0, 0, 0.45);
+    --grid: rgba(255, 255, 255, 0.03);
+  }
+
+  /* ---- base ------------------------------------------------------------- */
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 44px 44px;
+    color: var(--text);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px 120px;
+  }
+
+  section { margin-top: 84px; }
+
+  h1, h2, h3 {
+    font-family: "Bricolage Grotesque", "IBM Plex Sans", sans-serif;
+    font-weight: 700;
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+    margin: 0;
+  }
+
+  h1 { font-size: clamp(2.4rem, 6vw, 3.4rem); line-height: 1.02; }
+  h2 { font-size: clamp(1.35rem, 3vw, 1.7rem); }
+  h3 { font-size: 1.02rem; font-weight: 500; }
+
+  p { margin: 0; }
+
+  a { color: var(--signal); text-underline-offset: 3px; }
+
+  .mono {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.74rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 14px;
+    margin-bottom: 30px;
+  }
+
+  .section-head .idx {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.8rem;
+    color: var(--signal);
+  }
+
+  /* ---- hero ----------------------------------------------------------- */
+  header {
+    padding-top: 96px;
+  }
+
+  header .lede {
+    font-size: clamp(1.05rem, 2.4vw, 1.3rem);
+    color: var(--muted);
+    max-width: 40ch;
+    margin-top: 22px;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 30px;
+  }
+
+  .chip {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.78rem;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    background: var(--panel-2);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--dim);
+    flex: none;
+  }
+  .dot.good { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+  .dot.amber { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); }
+  .dot.signal { background: var(--signal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 22%, transparent); }
+
+  /* ---- pipeline strip ------------------------------------------------- */
+  .pipe {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+
+  .stage {
+    padding: 22px 18px;
+    border-right: 1px solid var(--line);
+    position: relative;
+  }
+  .stage:last-child { border-right: none; }
+
+  .stage .n {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--dim);
+  }
+  .stage .name {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin: 6px 0 4px;
+  }
+  .stage .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .stage .bar {
+    height: 3px;
+    margin-top: 16px;
+    border-radius: 2px;
+    background: var(--line);
+  }
+  .stage.real .bar { background: var(--signal); }
+  .stage.mock .bar { background: var(--amber); }
+
+  @media (max-width: 680px) {
+    .pipe { grid-template-columns: repeat(2, 1fr); }
+    .stage { border-bottom: 1px solid var(--line); }
+  }
+
+  /* ---- split cards -------------------------------------------------- */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 680px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 22px 24px;
+  }
+
+  .card h3 {
+    font-family: "IBM Plex Mono", monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.74rem;
+    color: var(--dim);
+    margin-bottom: 14px;
+  }
+
+  .card ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .card li {
+    display: grid;
+    grid-template-columns: 16px 1fr;
+    gap: 10px;
+    align-items: start;
+    font-size: 0.94rem;
+  }
+  .card li .m { color: var(--signal); font-family: "IBM Plex Mono", monospace; }
+  .card.mocked li .m { color: var(--amber); }
+
+  /* ---- DoD result ------------------------------------------------- */
+  .result {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 20px 22px;
+    border: 1px dashed var(--line);
+    border-radius: 14px;
+    background: var(--panel-2);
+  }
+  .result .verdict {
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+  }
+  .meter { display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
+  .meter .row { display: flex; align-items: center; gap: 10px; font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; }
+  .meter .track { flex: 1; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .meter .fill { height: 100%; border-radius: 4px; }
+  .fill.match { background: var(--good); }
+  .fill.diff { background: var(--amber); }
+
+  /* ---- now list ------------------------------------------------- */
+  .now {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .now .item {
+    display: grid;
+    grid-template-columns: 132px 1fr;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--line);
+  }
+  .now .item:last-child { border-bottom: 1px solid var(--line); }
+  .now .k {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    padding-top: 2px;
+  }
+  .now .v { font-size: 0.98rem; }
+  .now .v b { font-weight: 600; }
+  @media (max-width: 620px) { .now .item { grid-template-columns: 1fr; gap: 6px; } }
+
+  /* ---- roadmap timeline --------------------------------------- */
+  .road { display: flex; flex-direction: column; }
+
+  .ver {
+    display: grid;
+    grid-template-columns: 78px 1fr;
+    gap: 22px;
+    padding: 20px 0;
+    border-top: 1px solid var(--line);
+    position: relative;
+  }
+  .ver:last-child { border-bottom: 1px solid var(--line); }
+
+  .ver .tick {
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 500;
+    font-size: 0.92rem;
+    color: var(--muted);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .ver .body h3 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 1.05rem; }
+  .ver .body p { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+  .ver .state {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--line);
+    color: var(--dim);
+    white-space: nowrap;
+    align-self: start;
+    margin-top: 3px;
+  }
+  .ver.done .tick { color: var(--good); }
+  .ver.done .state { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+  .ver.next .tick { color: var(--amber); }
+  .ver.next .state { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, var(--line)); }
+  .ver.done .body h3::after { content: " ✓"; color: var(--good); }
+
+  .ver .body { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+  @media (max-width: 620px) {
+    .ver { grid-template-columns: 54px 1fr; gap: 14px; }
+    .ver .body { flex-direction: column; }
+  }
+
+  /* ---- build principles ------------------------------------- */
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .grid-3 { grid-template-columns: 1fr; } }
+  .prin h3 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 1rem; text-transform: none; letter-spacing: normal; color: var(--text); margin-bottom: 8px; }
+  .prin p { font-size: 0.88rem; color: var(--muted); }
+
+  footer {
+    margin-top: 90px;
+    padding-top: 26px;
+    border-top: 1px solid var(--line);
+    color: var(--dim);
+    font-size: 0.82rem;
+  }
+  footer .stack { font-family: "IBM Plex Mono", monospace; color: var(--muted); margin-bottom: 8px; }
+
+  /* ---- reveal ------------------------------------------------ */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+
+  :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 3px; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Build status &nbsp;·&nbsp; 29 Aug 2026</div>
+    <h1>InfraReplay</h1>
+    <p class="lede">Record a real HTTP&nbsp;+&nbsp;PostgreSQL workflow, store it as a portable
+      recording, replay it somewhere else, and get an automatic diff.</p>
+    <div class="chips">
+      <span class="chip"><span class="dot good"></span> v1 shipped</span>
+      <span class="chip"><span class="dot signal"></span> 15 tests green</span>
+      <span class="chip"><span class="dot amber"></span> capture still mocked</span>
+      <span class="chip"><span class="dot"></span> 12 versions planned</span>
+    </div>
+  </header>
+
+  <section class="reveal">
+    <div class="section-head">
+      <span class="idx">01</span>
+      <h2>The loop</h2>
+    </div>
+    <p style="color:var(--muted);max-width:60ch;margin-bottom:22px">
+      Five stages. v1 builds every one of them for real — only the data
+      source at the front is synthetic.</p>
+    <div class="pipe">
+      <div class="stage mock">
+        <div class="n">01</div><div class="name">Capture</div>
+        <div class="tag">mock plugin</div><div class="bar"></div>
+      </div>
+      <div class="stage real">
+        <div class="n">02</div><div class="name">Correlate</div>
+        <div class="tag">one correlation_id</div><div class="bar"></div>
+      </div>
+      <div class="stage real">
+        <div class="n">03</div><div class="name">Store</div>
+        <div class="tag">metadata + blobs</div><div class="bar"></div>
+      </div>
+      <div class="stage real">
+        <div class="n">04</div><div class="name">Replay</div>
+        <div class="tag">against mock target</div><div class="bar"></div>
+      </div>
+      <div class="stage real">
+        <div class="n">05</div><div class="name">Compare</div>
+        <div class="tag">per-field diff</div><div class="bar"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="section-head">
+      <span class="idx">02</span>
+      <h2>Where v1 stands</h2>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Real &amp; exercised</h3>
+        <ul>
+          <li><span class="m">·</span> Versioned <b>Event</b> schema + migration registry</li>
+          <li><span class="m">·</span> Entry-point <b>plugin registry</b> — 5 built-ins, no core imports a plugin</li>
+          <li><span class="m">·</span> Async SQLAlchemy metadata store + Alembic</li>
+          <li><span class="m">·</span> Filesystem blob storage for recording snapshots</li>
+          <li><span class="m">·</span> Default redaction — <span class="mono">Authorization</span>, cookies, card tokens</li>
+          <li><span class="m">·</span> Replay engine with production-target safety check</li>
+          <li><span class="m">·</span> Comparison engine — <span class="mono">MATCH / DIFFERENT / MISSING / NEW / ERROR</span></li>
+          <li><span class="m">·</span> FastAPI + <span class="mono">infractl</span> CLI + NiceGUI dashboard</li>
+        </ul>
+      </div>
+      <div class="card mocked">
+        <h3>Mocked at v1 — on purpose</h3>
+        <ul>
+          <li><span class="m">·</span> <b>Capture.</b> <span class="mono">MockCapturePlugin</span> emits a full
+            transactional checkout — no real network or DB traffic</li>
+          <li><span class="m">·</span> <b>Replay target <span class="mono">mock</span>.</b> Deterministic; always
+            returns the clean outcome</li>
+          <li><span class="m">·</span> Everything downstream of capture is the code v2/v3 will keep</li>
+        </ul>
+        <p style="color:var(--muted);font-size:0.86rem;margin-top:16px">
+          The README says this in plain terms — v1 is an honest prototype
+          of the concept, not a finished product.</p>
+      </div>
+    </div>
+
+    <div class="result">
+      <div>
+        <div class="eyebrow" style="margin-bottom:6px">Definition of done</div>
+        <div class="verdict">Replay the buggy checkout → the incident reproduces.</div>
+      </div>
+      <div class="meter">
+        <div class="row"><span style="color:var(--good)">MATCH</span>
+          <span class="track"><span class="fill match" style="width:66%"></span></span> 4</div>
+        <div class="row"><span style="color:var(--amber)">DIFFERENT</span>
+          <span class="track"><span class="fill diff" style="width:34%"></span></span> 2</div>
+        <div class="row" style="color:var(--dim)">auth · order · items · inventory match;
+          payment &amp; response differ</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="section-head">
+      <span class="idx">03</span>
+      <h2>What I'm doing now</h2>
+    </div>
+    <div class="now">
+      <div class="item">
+        <div class="k">Demo data</div>
+        <div class="v"><b>Made the synthetic capture look production-real.</b> One request now
+          fans out to auth <span class="mono">SELECT</span> → <span class="mono">BEGIN</span> →
+          <span class="mono">INSERT orders</span> → <span class="mono">INSERT order_items</span> →
+          <span class="mono">UPDATE inventory</span> → <span class="mono">INSERT payments</span> →
+          <span class="mono">COMMIT</span>, with real headers, params, totals and per-step timing.
+          The buggy run declines the card and rolls back.</div>
+      </div>
+      <div class="item">
+        <div class="k">Dashboard</div>
+        <div class="v"><b>Rebuilt the UI around the timeline.</b> Request waterfall with duration
+          bars, every event expandable to its SQL / headers / body, and a
+          captured-vs-replayed comparison view that shows the exact fields that changed.</div>
+      </div>
+      <div class="item">
+        <div class="k">This deck</div>
+        <div class="v">Standing status page for the presentation — progress, the loop, and the
+          road ahead in one place.</div>
+      </div>
+      <div class="item">
+        <div class="k">Next</div>
+        <div class="v">Start <b>v2</b>: a real Starlette reverse-proxy capture plugin that drops
+          into the exact pipeline above — nothing downstream changes.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="section-head">
+      <span class="idx">04</span>
+      <h2>Roadmap · v1 → v12</h2>
+    </div>
+    <p style="color:var(--muted);max-width:58ch;margin-bottom:24px">
+      Each version ends in a state you can <span class="mono">docker compose up</span> and demo.
+      No version depends on unfinished work from a later one.</p>
+
+    <div class="road">
+      <div class="ver done">
+        <div class="tick">v1</div>
+        <div class="body">
+          <div>
+            <h3>Full pipeline demo</h3>
+            <p>Schema, registry, storage, replay, comparison, API, CLI, dashboard — end to end on synthetic capture.</p>
+          </div>
+          <span class="state">Shipped</span>
+        </div>
+      </div>
+      <div class="ver next">
+        <div class="tick">v2</div>
+        <div class="body">
+          <div>
+            <h3>Real HTTP capture</h3>
+            <p>Starlette reverse proxy: correlation IDs, header/body redaction, size limits, recording lifecycle.</p>
+          </div>
+          <span class="state">Next</span>
+        </div>
+      </div>
+      <div class="ver">
+        <div class="tick">v3</div>
+        <div class="body">
+          <div><h3>Real PostgreSQL capture + correlation</h3>
+          <p>SQLAlchemy event listeners; the in-flight request's correlation ID follows every query via contextvars.</p></div>
+          <span class="state">Planned</span>
+        </div>
+      </div>
+      <div class="ver">
+        <div class="tick">v4</div>
+        <div class="body">
+          <div><h3>Real replay engine</h3>
+          <p>Replay captured recordings against a live target; substitution engine for UUIDs and timestamps.</p></div>
+          <span class="state">Planned</span>
+        </div>
+      </div>
+      <div class="ver">
+        <div class="tick">v5</div>
+        <div class="body">
+          <div><h3>Comparison hardening</h3>
+          <p>Robust against timestamp jitter, non-deterministic IDs and latency — no false <span class="mono">DIFFERENT</span>s.</p></div>
+          <span class="state">Planned</span>
+        </div>
+      </div>
+      <div class="ver">
+        <div class="tick">v6</div>
+        <div class="body">
+          <div><h3>Demo shop + intentional bug</h3>
+          <p>A real FastAPI + Postgres app with a concurrent inventory-reservation bug to catch on replay.</p></div>
+          <span class="state">Planned</span>
+        </div>
+      </div>
+      <div class="ver">
+        <div class="tick">v7</div>
+        <div class="body">
+          <div><h3>CLI completeness + export/import</h3>
+          <p>Export a recording to one file, re-import it into a fresh instance, replay it there.</p></div>
+          <span class="state">Planned</span>
+        </div>
+      </div>
+      <div class="ver">
+        <div class="tick">v8</div>
+        <div class="body">
+          <div><h3>Security hardening</h3>
+          <p>Blob encryption at rest, API keys, audit log; tests assert secrets never reach storage or the API.</p></div>
+          <span class="state">Planned</span>
+        </div>
+      </div>
+      <div class="ver">
+        <div class="tick">v9</div>
+        <div class="body">
+          <div><h3>Observability</h3>
+          <p>Prometheus metrics and structured logs; a Grafana-importable dashboard in <span class="mono">docs/</span>.</p></div>
+          <span class="state">Planned</span>
+        </div>
+      </div>
+      <div class="ver">
+        <div class="tick">v10</div>
+        <div class="body">
+          <div><h3>Benchmark suite</h3>
+          <p>Locust load against the demo shop with capture on and off; publish the method, not just numbers.</p></div>
+          <span class="state">Planned</span>
+        </div>
+      </div>
+      <div class="ver">
+        <div class="tick">v11</div>
+        <div class="body">
+          <div><h3>External service mocking</h3>
+          <p>Payment / email / SMS / shipping stubs so replay never touches a real third party by default.</p></div>
+          <span class="state">Planned</span>
+        </div>
+      </div>
+      <div class="ver">
+        <div class="tick">v12</div>
+        <div class="body">
+          <div><h3>Post-MVP plugin: Kafka capture</h3>
+          <p>A separately <span class="mono">pip install</span>ed package that registers itself with zero core changes.</p></div>
+          <span class="state">Planned</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="section-head">
+      <span class="idx">05</span>
+      <h2>How it's built</h2>
+    </div>
+    <div class="grid-3">
+      <div class="card prin">
+        <h3>Plugins, not forks</h3>
+        <p>Capture sources, storage, redaction and comparators are entry-point plugins.
+          The core talks to interfaces only — the mock capture proves it.</p>
+      </div>
+      <div class="card prin">
+        <h3>The schema is the API</h3>
+        <p>Every component agrees on one Pydantic <span class="mono">Event</span> with a
+          <span class="mono">schema_version</span>. New fields are additive; breaking changes get a migration.</p>
+      </div>
+      <div class="card prin">
+        <h3>Safe by default</h3>
+        <p>Replay refuses production-looking targets without an override.
+          Redaction masks credentials on every captured event.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="stack">FastAPI · Typer · Pydantic v2 · SQLAlchemy 2.0 async · Alembic · NiceGUI · httpx · structlog · pytest</div>
+    <div>InfraReplay — Python rewrite. College demo prototype: capture is mocked at v1, and the README says so.</div>
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !("IntersectionObserver" in window)) {
+      document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("in"); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+  })();
+</script>
