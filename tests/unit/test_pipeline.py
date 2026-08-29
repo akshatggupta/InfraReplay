@@ -20,11 +20,11 @@ async def test_capture_completes_and_redacts():
     rec = await _capture("clean")
 
     assert rec.status is RecordingStatus.COMPLETED
-    assert len(rec.events) == 8
+    assert len(rec.events) == 14
     assert rec.events[0].payload["headers"]["authorization"] == REDACTED
 
     stored = await get_recording(rec.recording_id)
-    assert stored is not None and len(stored.events) == 8
+    assert stored is not None and len(stored.events) == 14
 
 
 async def test_replay_buggy_surfaces_match_and_different():

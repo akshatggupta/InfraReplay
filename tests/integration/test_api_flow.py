@@ -29,7 +29,7 @@ async def test_seed_list_show_replay_compare(client: httpx.AsyncClient):
 
     buggy = next(r for r in seeded if "fails" in r["title"])
     detail = (await client.get(f"/api/recordings/{buggy['recording_id']}")).json()
-    assert len(detail["events"]) == 8
+    assert len(detail["events"]) == 14
 
     replay = (
         await client.post(

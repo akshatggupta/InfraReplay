@@ -25,7 +25,7 @@ async def test_mock_capture_yields_full_workflow():
 
     events = [e async for e in plugin.events()]
 
-    assert [e.sequence for e in events] == list(range(8))
+    assert [e.sequence for e in events] == list(range(14))
     assert events[0].event_type is EventType.HTTP_REQUEST
     assert events[-1].payload["status"] == 402
     assert len({e.correlation_id for e in events}) == 1

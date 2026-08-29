@@ -9,10 +9,12 @@ recording, replay it elsewhere, and get an automatic diff.
 
 The entire pipeline runs end to end: schema, plugin registry, storage,
 replay engine, comparator, API, CLI, dashboard. Capture is **mocked** at
-this stage — `MockCapturePlugin` generates realistic synthetic events
-(`POST /orders` → `INSERT order` → `UPDATE inventory` → `SELECT payment`).
-Real capture plugins (HTTP proxy, Postgres instrumentation) plug into
-this same pipeline in v2/v3 without rewriting anything above.
+this stage — `MockCapturePlugin` generates a realistic `demo_shop`
+checkout: `POST /api/v1/checkout` → auth `SELECT` → `BEGIN` → `INSERT
+orders` → `INSERT order_items` → `UPDATE inventory` → `INSERT payments`
+→ `COMMIT`, all under one `correlation_id`. Real capture plugins (HTTP
+proxy, Postgres instrumentation) plug into this same pipeline in v2/v3
+without rewriting anything above.
 
 ## Quick start (local, no Docker)
 
@@ -50,18 +52,21 @@ rec_83c0b4f0  [capture/completed]  Checkout — clean run
 
 $ infractl replay rec_071f2ad3 --target mock
 replay rpl_7b5b0579 against mock
-summary: {'MATCH': 2, 'DIFFERENT': 2, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
+summary: {'MATCH': 4, 'DIFFERENT': 2, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
 
 $ infractl compare rpl_7b5b0579
+MATCH      postgres.result   (auth, order, line items, inventory)
 MATCH      postgres.result
 MATCH      postgres.result
-DIFFERENT  postgres.result  {'rows_affected': {'original': 0, 'replayed': 1}, ...}
-DIFFERENT  http.response    {'status': {'original': 402, 'replayed': 201}, ...}
+MATCH      postgres.result
+DIFFERENT  postgres.result   {'rows': {'original': [{'state': 'declined', ...}], ...}}
+DIFFERENT  http.response     {'status': {'original': 402, 'replayed': 201}, ...}
 ```
 
-In the dashboard: recordings list → click a recording → timeline
-(nested HTTP→DB tree) → **Replay against mock** → side-by-side
-comparison with `MATCH` / `DIFFERENT` badges.
+In the dashboard: recordings list → click a recording → request-scoped
+waterfall (nested HTTP→DB events with duration bars, expand any event
+for its SQL / headers / body) → **Replay against mock** → captured-vs-
+replayed comparison with per-field diffs.
 
 ## CLI
 
