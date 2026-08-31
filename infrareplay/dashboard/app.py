@@ -184,6 +184,8 @@ def _kv(pairs: list[tuple[str, str]]) -> None:
 
 @ui.page("/")
 async def index() -> None:
+    await ui.context.client.connected()
+
     with _shell_open("recordings"):
         with ui.row().classes("items-center w-full"):
             ui.label("Recordings").classes("text-2xl font-semibold text-white")
@@ -290,6 +292,8 @@ def _depth(e: dict, by_id: dict[str, dict]) -> int:
 
 @ui.page("/recording/{recording_id}")
 async def recording_detail(recording_id: str) -> None:
+    await ui.context.client.connected()
+
     with _shell_open(recording_id):
         try:
             rec = await _get(f"/api/recordings/{recording_id}")
@@ -422,6 +426,8 @@ def _event_detail(e: dict) -> None:
 
 @ui.page("/replay/{replay_recording_id}")
 async def replay_comparison(replay_recording_id: str) -> None:
+    await ui.context.client.connected()
+
     with _shell_open(f"replay {replay_recording_id}"):
         try:
             results = await _get(
