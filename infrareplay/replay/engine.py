@@ -1,21 +1,31 @@
-"""Replay a Recording against a target, producing a linked ReplayRun.
+"""Replay a Recording against a target.
 
-v1 targets:
-  - "mock": the target is a deterministic function that always yields the
-    canonical *clean* outcome. Replaying a buggy recording against it
-    therefore surfaces real MATCH and DIFFERENT rows downstream.
+Two kinds of target:
 
-Real HTTP targets arrive in v4; the engine boundary here does not change.
+  - "mock"              a deterministic function returning the canonical
+                        *clean* outcome. Replaying the buggy fixture against
+                        it surfaces real MATCH and DIFFERENT rows with no
+                        infrastructure running (v1).
+  - "http(s)://host"    a live service. Requests are actually sent and the
+                        real responses recorded (v4).
+
+Safety lives here, not in the callers: a production-looking target is
+refused unless the caller passes SafetyMode.UNSAFE.
 """
 
+import asyncio
+from collections.abc import Iterator
 from enum import Enum
 
 from infrareplay import config
 from infrareplay.plugins.mock_capture.fixtures import Scenario, build
-from infrareplay.replay.substitution import SubstitutionEngine
-from infrareplay.schema import Event, Recording
+from infrareplay.replay.http_target import HttpTarget
+from infrareplay.replay.substitution import AutoMode, SubstitutionEngine
+from infrareplay.schema import Event, EventType, Recording
 
 MOCK_TARGET = "mock"
+
+_HTTP_SCHEMES = ("http://", "https://")
 
 
 class SafetyMode(str, Enum):
@@ -33,57 +43,115 @@ def _looks_like_prod(target: str) -> bool:
     return any(marker in lowered for marker in config.PROD_TARGET_MARKERS)
 
 
-def replay_recording(
-    source: Recording,
-    *,
-    target: str,
-    replay_recording_id: str,
-    safety: SafetyMode = SafetyMode.SAFE,
-    substitutions: dict[str, str] | None = None,
-) -> tuple[list[Event], dict[str, str]]:
-    """Return (replayed_events, links) where links maps original -> replay id."""
+def ensure_safe(target: str, safety: SafetyMode) -> None:
+    """Raise unless `target` may be replayed against.
+
+    Callers check this *before* opening a replay recording, so a refused
+    replay leaves nothing behind; the engine checks it again below, because
+    safety is the engine's invariant, not the caller's good manners.
+    """
 
     if safety is SafetyMode.SAFE and _looks_like_prod(target):
         raise ReplayError(
             f"target {target!r} looks like production; pass unsafe to override"
         )
 
+
+async def replay_recording(
+    source: Recording,
+    *,
+    target: str,
+    replay_recording_id: str,
+    safety: SafetyMode = SafetyMode.SAFE,
+    substitutions: dict[str, str] | None = None,
+    auto: AutoMode = AutoMode.OFF,
+    concurrency: int = 1,
+) -> list[Event]:
+    """Return the events produced by replaying `source` against `target`.
+
+    `concurrency` > 1 sends that many requests at once — the only way to
+    reproduce a race, which is exactly what the demo shop's bug is.
+    """
+
+    ensure_safe(target, safety)
+
     if not source.events:
         raise ReplayError("source recording has no events to replay")
 
-    if target != MOCK_TARGET:
-        raise ReplayError(f"v1 replay only supports target {MOCK_TARGET!r}")
+    subs = SubstitutionEngine(substitutions, auto=auto)
 
-    subs = SubstitutionEngine(substitutions)
+    if target == MOCK_TARGET:
+        return _replay_mock(source, replay_recording_id, subs)
 
-    # The mock target's response: the canonical clean stream, aligned to the
-    # source by `sequence`.
+    if target.startswith(_HTTP_SCHEMES):
+        return await _replay_http(source, replay_recording_id, target, subs, concurrency)
+
+    raise ReplayError(f"unsupported replay target {target!r}")
+
+
+# ----------------------------------------------------------------------- mock
+
+
+def _replay_mock(
+    source: Recording,
+    replay_recording_id: str,
+    subs: SubstitutionEngine,
+) -> list[Event]:
     canonical = build(replay_recording_id, Scenario.CLEAN)
-    by_seq = {e.sequence: e for e in canonical}
+    by_sequence = {e.sequence: e for e in canonical}
 
     replayed: list[Event] = []
-    links: dict[str, str] = {}
 
     for original in source.events:
-        target_event = by_seq.get(original.sequence)
+        stand_in = by_sequence.get(original.sequence)
 
-        if target_event is None:
-            continue  # nothing in the replay stream matches this step
+        if stand_in is None:
+            continue  # nothing in the canonical stream matches this step
 
         payload = (
             subs.apply(original.payload)
-            if original.event_type.value.startswith("http.request")
-            else target_event.payload
+            if original.event_type is EventType.HTTP_REQUEST
+            else stand_in.payload
         )
 
-        new_event = target_event.model_copy(
-            update={
-                "payload": payload,
-                "correlation_id": canonical[0].correlation_id,
-            }
+        replayed.append(
+            stand_in.model_copy(
+                update={
+                    "payload": payload,
+                    "correlation_id": canonical[0].correlation_id,
+                }
+            )
         )
 
-        replayed.append(new_event)
-        links[original.event_id] = new_event.event_id
+    return replayed
 
-    return replayed, links
+
+# ----------------------------------------------------------------------- http
+
+
+async def _replay_http(
+    source: Recording,
+    replay_recording_id: str,
+    target: str,
+    subs: SubstitutionEngine,
+    concurrency: int,
+) -> list[Event]:
+    requests = [e for e in source.events if e.event_type is EventType.HTTP_REQUEST]
+
+    if not requests:
+        raise ReplayError("recording contains no HTTP requests to replay")
+
+    payloads = [subs.apply(r.payload) for r in requests]
+    replayed: list[Event] = []
+
+    async with HttpTarget(target, recording_id=replay_recording_id) as live:
+        for batch in _batches(payloads, max(concurrency, 1)):
+            for pair in await asyncio.gather(*(live.send(p) for p in batch)):
+                replayed.extend(pair)
+
+    return replayed
+
+
+def _batches(payloads: list[dict], size: int) -> Iterator[list[dict]]:
+    for start in range(0, len(payloads), size):
+        yield payloads[start : start + size]
