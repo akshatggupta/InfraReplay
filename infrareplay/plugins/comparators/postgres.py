@@ -1,5 +1,6 @@
 """PostgresComparator — compares replayed query results to the originals."""
 
+from infrareplay.comparison.normalize import normalize
 from infrareplay.contracts import ComparatorPlugin
 from infrareplay.schema import ComparisonCategory, ComparisonResult, Event
 
@@ -29,8 +30,8 @@ class PostgresComparator(ComparatorPlugin):
         diff: dict = {}
 
         for key in (_ROWS_AFFECTED, _ROWS):
-            orig = original.payload.get(key)
-            new = replayed.payload.get(key)
+            orig = normalize(original.payload.get(key))
+            new = normalize(replayed.payload.get(key))
 
             if orig != new:
                 diff[key] = {"original": orig, "replayed": new}

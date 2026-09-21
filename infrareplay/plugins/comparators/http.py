@@ -1,5 +1,6 @@
 """HttpComparator — compares replayed HTTP responses to the originals."""
 
+from infrareplay.comparison.normalize import normalize
 from infrareplay.contracts import ComparatorPlugin
 from infrareplay.schema import ComparisonCategory, ComparisonResult, Event
 
@@ -34,8 +35,9 @@ class HttpComparator(ComparatorPlugin):
         if orig_status != new_status:
             diff[_STATUS] = {"original": orig_status, "replayed": new_status}
 
-        orig_body = original.payload.get(_BODY)
-        new_body = replayed.payload.get(_BODY)
+        # Normalised: a fresh order id is not a difference, a 402 is.
+        orig_body = normalize(original.payload.get(_BODY))
+        new_body = normalize(replayed.payload.get(_BODY))
 
         if orig_body != new_body:
             diff[_BODY] = {"original": orig_body, "replayed": new_body}
