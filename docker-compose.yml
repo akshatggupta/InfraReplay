@@ -23,6 +23,23 @@ services:
       - blobs:/data/blobs
     ports:
       - "8000:8000"
+      # Where `infractl capture start --listen :8081` listens.
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  shop:
+    build: .
+    command: uvicorn examples.demo_shop.app:app --host 0.0.0.0 --port 3000
+    environment:
+      # Shares the Postgres instance; its tables do not overlap InfraReplay's.
+      DEMO_SHOP_DATABASE_URL: postgresql+asyncpg://infrareplay:infrareplay@postgres:5432/infrareplay
+      INFRAREPLAY_API_URL: http://api:8000
+      # Set to "1" to switch the inventory bug off.
+      DEMO_SHOP_LOCK_INVENTORY: "0"
+    ports:
+      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
