@@ -1,8 +1,9 @@
 """InfraReplay dashboard.
 
-Three views, all thin clients over the REST API:
+Four views, all thin clients over the REST API:
 
     /                          recordings + replays index
+    /captures                  start / stop a live capture proxy
     /recording/{id}            request-scoped event waterfall
     /replay/{id}               original vs replayed comparison
 """
@@ -76,6 +77,20 @@ async def _post(path: str, payload: dict | None = None):
         resp = await c.post(path, json=payload)
         resp.raise_for_status()
         return resp.json()
+
+
+async def _try_post(path: str, payload: dict | None = None):
+    """Post, but turn a rejection into a toast instead of a stack trace."""
+
+    try:
+        return await _post(path, payload)
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.json().get("detail", exc.response.text)
+        ui.notify(detail, type="negative")
+    except httpx.HTTPError as exc:
+        ui.notify(f"API unreachable: {exc}", type="negative")
+
+    return None
 
 
 # --------------------------------------------------------------------- format
@@ -152,6 +167,8 @@ def _shell_open(title: str):
                 "text-xs text-slate-500 hidden sm:block"
             )
             ui.space()
+            ui.link("recordings", "/").classes("no-underline text-slate-400 text-xs")
+            ui.link("captures", "/captures").classes("no-underline text-slate-400 text-xs")
             ui.label(title).classes("ir-mono text-xs text-slate-400")
 
     return ui.column().classes("ir-shell w-full gap-5 pt-6")
@@ -270,6 +287,98 @@ def _recording_card(rec: dict) -> None:
                 )
 
 
+# ------------------------------------------------------------------- capture
+
+
+@ui.page("/captures")
+async def captures() -> None:
+    await ui.context.client.connected()
+
+    with _shell_open("captures"):
+        ui.label("Live capture").classes("text-2xl font-semibold text-white")
+        ui.label(
+            "Start a proxy in front of your app. Traffic you send through it is "
+            "recorded, and an instrumented app streams its SQL into the same "
+            "recording."
+        ).classes("text-sm text-slate-500")
+
+        with ui.element("div").classes("ir-card p-4 w-full"):
+            with ui.row().classes("w-full gap-3 items-end flex-wrap"):
+                upstream = ui.input(
+                    "Upstream app", value="http://127.0.0.1:3000"
+                ).classes("grow").props("dark dense outlined")
+                port = ui.number("Listen port", value=8081, format="%d").props(
+                    "dark dense outlined"
+                )
+                title = ui.input("Title", value="Checkout capture").classes(
+                    "grow"
+                ).props("dark dense outlined")
+
+                async def start() -> None:
+                    started = await _try_post(
+                        "/api/captures",
+                        {
+                            "plugin": "http_capture",
+                            "title": title.value,
+                            "config": {
+                                "upstream": upstream.value,
+                                "listen_port": int(port.value or 0),
+                            },
+                        },
+                    )
+
+                    if started:
+                        ui.navigate.reload()
+
+                ui.button("Start capture", on_click=start, icon="fiber_manual_record").props(
+                    "unelevated color=teal-6"
+                )
+
+        try:
+            sessions = await _get("/api/captures")
+        except httpx.HTTPError as exc:
+            _api_down(exc)
+            return
+
+        if not sessions:
+            ui.label("No capture running.").classes("text-slate-500")
+            return
+
+        ui.label("Recording now").classes(
+            "text-xs uppercase tracking-wider text-slate-500 mt-2"
+        )
+
+        for session in sessions:
+            _session_card(session)
+
+
+def _session_card(session: dict) -> None:
+    rid = session["recording_id"]
+
+    with ui.element("div").classes("ir-card p-4 w-full"):
+        with ui.row().classes("items-center w-full gap-3"):
+            ui.icon("sensors").style("color:#f87171")
+            ui.label(session["title"]).classes("text-base font-medium text-white")
+            ui.space()
+
+            async def stop(recording_id: str = rid) -> None:
+                stopped = await _try_post(f"/api/captures/{recording_id}/stop")
+
+                if stopped:
+                    ui.navigate.to(f"/recording/{recording_id}")
+
+            ui.button("Stop", on_click=stop, icon="stop").props("outline color=red-4")
+
+        _kv(
+            [
+                ("recording", rid),
+                ("send traffic to", f"http://localhost:{session['listen_port']}"),
+                ("forwards to", session["target"]),
+                ("plugin", session["plugin"]),
+            ]
+        )
+
+
 # ------------------------------------------------------------------- timeline
 
 
@@ -310,18 +419,17 @@ async def recording_detail(recording_id: str) -> None:
             )
             ui.space()
 
+            ui.button(
+                "Export",
+                on_click=lambda: ui.download.from_url(
+                    f"{_API}/api/recordings/{recording_id}/export",
+                    f"{recording_id}.json",
+                ),
+                icon="download",
+            ).props("outline color=slate-4")
+
             if is_capture:
-
-                async def replay() -> None:
-                    out = await _post(
-                        "/api/replays",
-                        {"recording_id": recording_id, "target": "mock"},
-                    )
-                    ui.navigate.to(f"/replay/{out['replay_recording_id']}")
-
-                ui.button("Replay against mock", on_click=replay, icon="restart_alt").props(
-                    "unelevated color=indigo-5"
-                )
+                _replay_button(recording_id)
 
         if not events:
             ui.label("This recording has no events.").classes("text-slate-500")
@@ -347,6 +455,48 @@ async def recording_detail(recording_id: str) -> None:
             ui.link("View comparison →", f"/replay/{recording_id}").classes(
                 "no-underline text-indigo-300"
             )
+
+
+def _replay_button(recording_id: str) -> None:
+    """Replay against the mock, or against a live service."""
+
+    with ui.dialog() as dialog, ui.element("div").classes("ir-card p-5 w-96"):
+        ui.label("Replay").classes("text-lg font-semibold text-white")
+
+        target = ui.input("Target", value="mock").classes("w-full").props(
+            "dark dense outlined"
+        )
+        ui.label("mock, or a live URL like http://127.0.0.1:3000").classes(
+            "text-xs text-slate-500"
+        )
+        concurrency = ui.number("Concurrency", value=1, format="%d").props(
+            "dark dense outlined"
+        )
+        unsafe = ui.checkbox("Allow production-looking targets").classes("text-slate-400")
+
+        async def run() -> None:
+            dialog.close()
+
+            out = await _try_post(
+                "/api/replays",
+                {
+                    "recording_id": recording_id,
+                    "target": target.value,
+                    "concurrency": int(concurrency.value or 1),
+                    "unsafe": unsafe.value,
+                },
+            )
+
+            if out:
+                ui.navigate.to(f"/replay/{out['replay_recording_id']}")
+
+        with ui.row().classes("w-full justify-end gap-2 mt-2"):
+            ui.button("Cancel", on_click=dialog.close).props("flat color=slate-5")
+            ui.button("Run replay", on_click=run).props("unelevated color=indigo-5")
+
+    ui.button("Replay", on_click=dialog.open, icon="restart_alt").props(
+        "unelevated color=indigo-5"
+    )
 
 
 def _waterfall(events: list[dict]) -> None:
@@ -464,7 +614,7 @@ async def replay_comparison(replay_recording_id: str) -> None:
 
         with ui.column().classes("w-full gap-3 mt-2"):
             for r in results:
-                _comparison_card(r, orig_by_id, replay_by_id)
+                _comparison_card(r, orig_by_id, replay_by_id, replay_rec.get("target") or "target")
 
 
 def _verdict(counts: dict[str, int], source: dict, replay: dict) -> None:
@@ -497,7 +647,10 @@ def _slice(event: dict | None) -> dict:
 
 
 def _comparison_card(
-    r: dict, orig_by_id: dict[str, dict], replay_by_id: dict[str, dict]
+    r: dict,
+    orig_by_id: dict[str, dict],
+    replay_by_id: dict[str, dict],
+    target: str,
 ) -> None:
     color = _CATEGORY_COLOR.get(r["category"], "#94a3b8")
     orig = orig_by_id.get(r.get("original_event_id"))
@@ -518,7 +671,7 @@ def _comparison_card(
 
             with ui.row().classes("w-full gap-3 no-wrap items-stretch"):
                 _pane("Captured", _slice(orig), "#94a3b8")
-                _pane("Replayed · mock", _slice(repl), color)
+                _pane(f"Replayed · {target}", _slice(repl), color)
 
 
 def _diff_rows(diff: dict) -> None:
