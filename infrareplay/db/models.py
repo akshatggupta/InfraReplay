@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import JSON, DateTime
 
@@ -48,8 +48,9 @@ class EventRow(Base):
 
     schema_version: Mapped[int] = mapped_column(Integer, default=1)
     sequence: Mapped[int] = mapped_column(Integer)
-    timestamp_ns: Mapped[int] = mapped_column(Integer)
-    duration_ns: Mapped[int] = mapped_column(Integer)
+    # Nanosecond wall clock overflows a 4-byte int on Postgres.
+    timestamp_ns: Mapped[int] = mapped_column(BigInteger)
+    duration_ns: Mapped[int] = mapped_column(BigInteger)
 
     event_type: Mapped[str] = mapped_column(String(32))
     service: Mapped[str] = mapped_column(String(128))
