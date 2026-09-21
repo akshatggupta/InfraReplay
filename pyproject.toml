@@ -32,6 +32,8 @@ infractl = "infrareplay.cli.main:app"
 # special-cases them.
 [project.entry-points."infrareplay.plugins"]
 mock_capture = "infrareplay.plugins.mock_capture.plugin:MockCapturePlugin"
+http_capture = "infrareplay.plugins.http_capture.plugin:HttpCapturePlugin"
+postgres_capture = "infrareplay.plugins.postgres_capture.plugin:PostgresCapturePlugin"
 storage_fs = "infrareplay.plugins.storage_fs.plugin:FilesystemStoragePlugin"
 redaction_default = "infrareplay.plugins.redaction_default.plugin:DefaultRedactionPlugin"
 http_comparator = "infrareplay.plugins.comparators.http:HttpComparator"
@@ -43,3 +45,6 @@ include = ["infrareplay*"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+# NiceGUI's browser-free page fixture; the full plugin needs selenium.
+addopts = "-p nicegui.testing.user_plugin"

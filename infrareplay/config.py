@@ -17,3 +17,15 @@ API_URL = os.environ.get("INFRAREPLAY_API_URL", "http://127.0.0.1:8000")
 # A replay target matching any of these fragments is refused unless the
 # caller passes an explicit unsafe override.
 PROD_TARGET_MARKERS = ("prod", "production", "live")
+
+# Live capture limits. Bodies above this are recorded as a truncation note
+# instead of the payload, so one big upload cannot blow up a recording.
+CAPTURE_MAX_BODY_BYTES = int(os.environ.get("INFRAREPLAY_MAX_BODY_BYTES", 64 * 1024))
+
+CAPTURE_TIMEOUT_S = float(os.environ.get("INFRAREPLAY_CAPTURE_TIMEOUT_S", 30))
+
+# Payload keys dropped before a comparison, on top of the built-in volatile
+# ones. Comma-separated, e.g. INFRAREPLAY_IGNORE_FIELDS=reference,eta_days
+IGNORE_FIELDS = frozenset(
+    f.strip() for f in os.environ.get("INFRAREPLAY_IGNORE_FIELDS", "").split(",") if f.strip()
+)
