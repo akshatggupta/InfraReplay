@@ -1,685 +1,775 @@
-<title>InfraReplay Roadmap</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>InfraReplay Build Status</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 
 <style>
-  /* ---- tokens : dark-first ---------------------------------------------- */
+  /* ---- tokens: light is the bare :root, dark redefines ------------------ */
   :root {
-    --ink: #0b0e14;
-    --panel: #131a25;
-    --panel-2: #0f1520;
-    --line: #253040;
-    --text: #e7ecf3;
-    --muted: #8a97a8;
-    --dim: #5c6a7d;
-    --signal: #3ce0c9;
-    --amber: #f2b45a;
-    --good: #57d98a;
-    --shadow: rgba(0, 0, 0, 0.45);
-    --grid: rgba(255, 255, 255, 0.03);
+    --ground: #f4f6f4;
+    --panel: #ffffff;
+    --sunk: #eaeeec;
+    --line: #d8ded9;
+    --text: #141a1c;
+    --muted: #57646a;
+    --dim: #86949a;
+    --signal: #0b7d72;
+    --signal-soft: rgba(11, 125, 114, 0.12);
+    --amber: #9a6410;
+    --amber-soft: rgba(154, 100, 16, 0.12);
+    --good: #1b7f4c;
+    --grid: rgba(20, 30, 35, 0.045);
   }
 
-  @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) {
-      --ink: #f2f4f7;
-      --panel: #ffffff;
-      --panel-2: #eaeef3;
-      --line: #d6dce4;
-      --text: #131a22;
-      --muted: #56606e;
-      --dim: #8894a2;
-      --signal: #0c9c8a;
-      --amber: #b1701a;
-      --good: #1f9d57;
-      --shadow: rgba(20, 30, 45, 0.1);
-      --grid: rgba(20, 30, 45, 0.035);
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0b0f12;
+      --panel: #141a1e;
+      --sunk: #101619;
+      --line: #25313a;
+      --text: #e7eef1;
+      --muted: #94a4ac;
+      --dim: #64757e;
+      --signal: #3fd6c0;
+      --signal-soft: rgba(63, 214, 192, 0.14);
+      --amber: #efb45f;
+      --amber-soft: rgba(239, 180, 95, 0.14);
+      --good: #5ed88d;
+      --grid: rgba(255, 255, 255, 0.035);
     }
   }
 
-  :root[data-theme="light"] {
-    --ink: #f2f4f7;
-    --panel: #ffffff;
-    --panel-2: #eaeef3;
-    --line: #d6dce4;
-    --text: #131a22;
-    --muted: #56606e;
-    --dim: #8894a2;
-    --signal: #0c9c8a;
-    --amber: #b1701a;
-    --good: #1f9d57;
-    --shadow: rgba(20, 30, 45, 0.1);
-    --grid: rgba(20, 30, 45, 0.035);
-  }
-
   :root[data-theme="dark"] {
-    --ink: #0b0e14;
-    --panel: #131a25;
-    --panel-2: #0f1520;
-    --line: #253040;
-    --text: #e7ecf3;
-    --muted: #8a97a8;
-    --dim: #5c6a7d;
-    --signal: #3ce0c9;
-    --amber: #f2b45a;
-    --good: #57d98a;
-    --shadow: rgba(0, 0, 0, 0.45);
-    --grid: rgba(255, 255, 255, 0.03);
+    --ground: #0b0f12;
+    --panel: #141a1e;
+    --sunk: #101619;
+    --line: #25313a;
+    --text: #e7eef1;
+    --muted: #94a4ac;
+    --dim: #64757e;
+    --signal: #3fd6c0;
+    --signal-soft: rgba(63, 214, 192, 0.14);
+    --amber: #efb45f;
+    --amber-soft: rgba(239, 180, 95, 0.14);
+    --good: #5ed88d;
+    --grid: rgba(255, 255, 255, 0.035);
   }
 
-  /* ---- base ------------------------------------------------------------- */
+  /* ---- base ------------------------------------------------------------ */
   * { box-sizing: border-box; }
-
-  html { scroll-behavior: smooth; }
 
   body {
     margin: 0;
-    background: var(--ink);
+    padding-block: 0 96px;
+    padding-left: 20px;
+    padding-right: 20px;
+    background: var(--ground);
     background-image:
       linear-gradient(var(--grid) 1px, transparent 1px),
       linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-    background-size: 44px 44px;
+    background-size: 48px 48px;
     color: var(--text);
     font-family: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    line-height: 1.65;
+    font-size: 15px;
+    line-height: 1.62;
     -webkit-font-smoothing: antialiased;
   }
 
-  .wrap {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 0 24px 120px;
-  }
-
-  section { margin-top: 84px; }
+  .wrap { max-width: 880px; margin: 0 auto; }
 
   h1, h2, h3 {
-    font-family: "Bricolage Grotesque", "IBM Plex Sans", sans-serif;
+    font-family: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
     font-weight: 700;
-    text-wrap: balance;
     letter-spacing: -0.015em;
+    text-wrap: balance;
     margin: 0;
   }
 
-  h1 { font-size: clamp(2.4rem, 6vw, 3.4rem); line-height: 1.02; }
-  h2 { font-size: clamp(1.35rem, 3vw, 1.7rem); }
-  h3 { font-size: 1.02rem; font-weight: 500; }
+  h1 { font-size: clamp(2.1rem, 6vw, 3rem); line-height: 1.04; }
+  h2 { font-size: clamp(1.25rem, 3vw, 1.55rem); }
+  h3 { font-size: 0.98rem; font-weight: 600; letter-spacing: 0; }
 
-  p { margin: 0; }
+  p { margin: 0; max-width: 68ch; }
 
   a { color: var(--signal); text-underline-offset: 3px; }
 
   .mono {
     font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.92em;
   }
 
   .eyebrow {
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.74rem;
-    letter-spacing: 0.22em;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--dim);
   }
 
-  .section-head {
+  section { margin-top: 68px; }
+
+  .head {
     display: flex;
     align-items: baseline;
     gap: 14px;
     border-bottom: 1px solid var(--line);
-    padding-bottom: 14px;
-    margin-bottom: 30px;
+    padding-bottom: 12px;
+    margin-bottom: 26px;
+    flex-wrap: wrap;
   }
 
-  .section-head .idx {
-    font-family: "IBM Plex Mono", monospace;
+  .head .eyebrow { margin-left: auto; }
+
+  /* ---- hero ------------------------------------------------------------ */
+  header { padding-block: 72px 0; }
+
+  header .lede {
+    margin-top: 18px;
+    font-size: clamp(1.02rem, 2.3vw, 1.18rem);
+    color: var(--muted);
+    max-width: 46ch;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    margin-top: 24px;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
     font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .facts b { color: var(--text); font-weight: 500; }
+
+  /* ---- version scrubber: the roadmap as a replay track ----------------- */
+  .track {
+    margin-top: 38px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    padding: 18px 18px 14px;
+  }
+
+  .ticks {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 4px;
+  }
+
+  .tick {
+    height: 30px;
+    border-radius: 4px;
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    display: grid;
+    place-items: center;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.7rem;
+    color: var(--dim);
+  }
+
+  .tick.done {
+    background: var(--signal-soft);
+    border-color: color-mix(in srgb, var(--signal) 45%, transparent);
     color: var(--signal);
   }
 
-  /* ---- hero ----------------------------------------------------------- */
-  header {
-    padding-top: 96px;
-  }
-
-  header .lede {
-    font-size: clamp(1.05rem, 2.4vw, 1.3rem);
-    color: var(--muted);
-    max-width: 40ch;
-    margin-top: 22px;
-  }
-
-  .chips {
+  .track .legend {
     display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.72rem;
+    color: var(--dim);
     flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 30px;
   }
 
-  .chip {
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.78rem;
-    padding: 6px 12px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    color: var(--muted);
-    background: var(--panel-2);
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--dim);
-    flex: none;
-  }
-  .dot.good { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
-  .dot.amber { background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); }
-  .dot.signal { background: var(--signal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 22%, transparent); }
-
-  /* ---- pipeline strip ------------------------------------------------- */
+  /* ---- pipeline -------------------------------------------------------- */
   .pipe {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 0;
     border: 1px solid var(--line);
-    border-radius: 14px;
+    border-radius: 12px;
     overflow: hidden;
     background: var(--panel);
   }
 
   .stage {
-    padding: 22px 18px;
+    padding: 16px 14px;
     border-right: 1px solid var(--line);
-    position: relative;
   }
+
   .stage:last-child { border-right: none; }
 
   .stage .n {
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.72rem;
-    color: var(--dim);
-  }
-  .stage .name {
-    font-family: "Bricolage Grotesque", sans-serif;
-    font-weight: 700;
-    font-size: 1.05rem;
-    margin: 6px 0 4px;
-  }
-  .stage .tag {
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.72rem;
-    color: var(--muted);
-  }
-  .stage .bar {
-    height: 3px;
-    margin-top: 16px;
-    border-radius: 2px;
-    background: var(--line);
-  }
-  .stage.real .bar { background: var(--signal); }
-  .stage.mock .bar { background: var(--amber); }
-
-  @media (max-width: 680px) {
-    .pipe { grid-template-columns: repeat(2, 1fr); }
-    .stage { border-bottom: 1px solid var(--line); }
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.7rem;
+    color: var(--signal);
   }
 
-  /* ---- split cards -------------------------------------------------- */
-  .grid-2 {
+  .stage h3 { margin: 4px 0 4px; }
+
+  .stage p { font-size: 0.82rem; color: var(--muted); }
+
+  /* ---- then / now ------------------------------------------------------ */
+  .cols {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 18px;
   }
-  @media (max-width: 680px) { .grid-2 { grid-template-columns: 1fr; } }
 
-  .card {
-    background: var(--panel);
+  .col {
     border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 22px 22px 24px;
+    border-radius: 12px;
+    background: var(--panel);
+    padding: 20px;
   }
 
-  .card h3 {
-    font-family: "IBM Plex Mono", monospace;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    font-size: 0.74rem;
+  .col.now { border-color: color-mix(in srgb, var(--signal) 40%, var(--line)); }
+
+  .col h3 { margin-bottom: 4px; }
+
+  .col > .eyebrow { display: block; margin-bottom: 12px; }
+
+  .col ul { margin: 14px 0 0; padding-left: 0; list-style: none; display: grid; gap: 12px; }
+
+  .col li { font-size: 0.88rem; color: var(--muted); }
+
+  .col li b { color: var(--text); font-weight: 600; }
+
+  .vtag {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.7rem;
+    color: var(--signal);
+    background: var(--signal-soft);
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin-right: 7px;
+  }
+
+  /* ---- transcript ------------------------------------------------------ */
+  .term {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--sunk);
+    overflow: hidden;
+  }
+
+  .term .bar {
+    border-bottom: 1px solid var(--line);
+    padding: 9px 14px;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.72rem;
     color: var(--dim);
-    margin-bottom: 14px;
+    background: var(--panel);
   }
 
-  .card ul {
+  .term pre {
     margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .card li {
-    display: grid;
-    grid-template-columns: 16px 1fr;
-    gap: 10px;
-    align-items: start;
-    font-size: 0.94rem;
-  }
-  .card li .m { color: var(--signal); font-family: "IBM Plex Mono", monospace; }
-  .card.mocked li .m { color: var(--amber); }
-
-  /* ---- DoD result ------------------------------------------------- */
-  .result {
-    margin-top: 18px;
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    flex-wrap: wrap;
-    padding: 20px 22px;
-    border: 1px dashed var(--line);
-    border-radius: 14px;
-    background: var(--panel-2);
-  }
-  .result .verdict {
-    font-family: "Bricolage Grotesque", sans-serif;
-    font-weight: 700;
-    font-size: 1.1rem;
-  }
-  .meter { display: flex; flex-direction: column; gap: 6px; min-width: 210px; }
-  .meter .row { display: flex; align-items: center; gap: 10px; font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; }
-  .meter .track { flex: 1; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
-  .meter .fill { height: 100%; border-radius: 4px; }
-  .fill.match { background: var(--good); }
-  .fill.diff { background: var(--amber); }
-
-  /* ---- now list ------------------------------------------------- */
-  .now {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .now .item {
-    display: grid;
-    grid-template-columns: 132px 1fr;
-    gap: 20px;
-    padding: 18px 0;
-    border-top: 1px solid var(--line);
-  }
-  .now .item:last-child { border-bottom: 1px solid var(--line); }
-  .now .k {
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 0.76rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--dim);
-    padding-top: 2px;
-  }
-  .now .v { font-size: 0.98rem; }
-  .now .v b { font-weight: 600; }
-  @media (max-width: 620px) { .now .item { grid-template-columns: 1fr; gap: 6px; } }
-
-  /* ---- roadmap timeline --------------------------------------- */
-  .road { display: flex; flex-direction: column; }
-
-  .ver {
-    display: grid;
-    grid-template-columns: 78px 1fr;
-    gap: 22px;
-    padding: 20px 0;
-    border-top: 1px solid var(--line);
-    position: relative;
-  }
-  .ver:last-child { border-bottom: 1px solid var(--line); }
-
-  .ver .tick {
-    font-family: "IBM Plex Mono", monospace;
-    font-weight: 500;
-    font-size: 0.92rem;
+    padding: 16px;
+    overflow-x: auto;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.78rem;
+    line-height: 1.75;
     color: var(--muted);
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
   }
-  .ver .body h3 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 1.05rem; }
-  .ver .body p { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
-  .ver .state {
-    font-family: "IBM Plex Mono", monospace;
+
+  .term .cmd { color: var(--text); }
+  .term .ok { color: var(--good); }
+  .term .warn { color: var(--amber); }
+  .term .dim { color: var(--dim); }
+
+  /* ---- roadmap table --------------------------------------------------- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+
+  table { border-collapse: collapse; width: 100%; min-width: 520px; }
+
+  th, td {
+    text-align: left;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.86rem;
+    vertical-align: top;
+  }
+
+  thead th {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+    font-weight: 500;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  td.v {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    color: var(--dim);
+    width: 3.2rem;
+  }
+
+  tr.shipped td.v { color: var(--signal); }
+
+  .state {
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
     font-size: 0.68rem;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     padding: 2px 8px;
-    border-radius: 5px;
+    border-radius: 999px;
+    white-space: nowrap;
     border: 1px solid var(--line);
     color: var(--dim);
-    white-space: nowrap;
-    align-self: start;
-    margin-top: 3px;
-  }
-  .ver.done .tick { color: var(--good); }
-  .ver.done .state { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
-  .ver.next .tick { color: var(--amber); }
-  .ver.next .state { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, var(--line)); }
-  .ver.done .body h3::after { content: " ✓"; color: var(--good); }
-
-  .ver .body { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
-  @media (max-width: 620px) {
-    .ver { grid-template-columns: 54px 1fr; gap: 14px; }
-    .ver .body { flex-direction: column; }
   }
 
-  /* ---- build principles ------------------------------------- */
-  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  @media (max-width: 720px) { .grid-3 { grid-template-columns: 1fr; } }
-  .prin h3 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: 1rem; text-transform: none; letter-spacing: normal; color: var(--text); margin-bottom: 8px; }
-  .prin p { font-size: 0.88rem; color: var(--muted); }
+  .state.on {
+    color: var(--signal);
+    border-color: color-mix(in srgb, var(--signal) 45%, transparent);
+    background: var(--signal-soft);
+  }
+
+  /* ---- runbook --------------------------------------------------------- */
+  .steps { display: grid; gap: 14px; counter-reset: step; }
+
+  .step {
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .step .num {
+    counter-increment: step;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.72rem;
+    color: var(--signal);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 3px 0;
+    text-align: center;
+    background: var(--panel);
+  }
+
+  .step .num::before { content: counter(step, decimal-leading-zero); }
+
+  .step code {
+    display: block;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.78rem;
+    color: var(--text);
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 7px 10px;
+    margin-top: 6px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .step p { font-size: 0.88rem; color: var(--muted); }
+
+  /* ---- limits ---------------------------------------------------------- */
+  .limits { display: grid; gap: 12px; }
+
+  .limit {
+    border-left: 2px solid var(--amber);
+    background: var(--amber-soft);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+  }
+
+  .limit b { font-weight: 600; }
+
+  .limit p { font-size: 0.86rem; color: var(--muted); }
+
+  /* ---- diagram --------------------------------------------------------- */
+  .figure {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    padding: 18px;
+    overflow-x: auto;
+  }
+
+  .figure svg { display: block; min-width: 520px; max-width: 100%; height: auto; margin: 0 auto; }
+
+  .figure figcaption {
+    margin-top: 12px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  figure { margin: 0; }
 
   footer {
-    margin-top: 90px;
-    padding-top: 26px;
+    margin-top: 72px;
     border-top: 1px solid var(--line);
+    padding-top: 18px;
+    font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    font-size: 0.74rem;
     color: var(--dim);
-    font-size: 0.82rem;
-  }
-  footer .stack { font-family: "IBM Plex Mono", monospace; color: var(--muted); margin-bottom: 8px; }
-
-  /* ---- reveal ------------------------------------------------ */
-  .reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }
-  .reveal.in { opacity: 1; transform: none; }
-
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    .reveal { opacity: 1; transform: none; transition: none; }
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
   }
 
-  :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 3px; }
+  @media (max-width: 720px) {
+    .pipe { grid-template-columns: 1fr 1fr; }
+    .stage { border-right: none; border-bottom: 1px solid var(--line); }
+    .cols { grid-template-columns: 1fr; }
+    .ticks { grid-template-columns: repeat(6, 1fr); }
+  }
 </style>
-
+</head>
+<body>
 <div class="wrap">
 
   <header>
-    <div class="eyebrow">Build status &nbsp;·&nbsp; 29 Aug 2026</div>
+    <p class="eyebrow">Build status · 21 September 2026</p>
     <h1>InfraReplay</h1>
-    <p class="lede">Record a real HTTP&nbsp;+&nbsp;PostgreSQL workflow, store it as a portable
-      recording, replay it somewhere else, and get an automatic diff.</p>
-    <div class="chips">
-      <span class="chip"><span class="dot good"></span> v1 shipped</span>
-      <span class="chip"><span class="dot signal"></span> 15 tests green</span>
-      <span class="chip"><span class="dot amber"></span> capture still mocked</span>
-      <span class="chip"><span class="dot"></span> 12 versions planned</span>
+    <p class="lede">
+      Record a real HTTP + PostgreSQL workflow, replay it somewhere else, and get an
+      automatic diff — so reproducing an incident stops being a guessing game.
+    </p>
+
+    <div class="facts">
+      <span><b>7 of 12</b> versions shipped</span>
+      <span><b>58%</b> of the roadmap</span>
+      <span><b>35</b> tests green</span>
+      <span><b>~3,000</b> lines of Python</span>
+    </div>
+
+    <div class="track">
+      <div class="ticks">
+        <div class="tick done">v1</div>
+        <div class="tick done">v2</div>
+        <div class="tick done">v3</div>
+        <div class="tick done">v4</div>
+        <div class="tick done">v5</div>
+        <div class="tick done">v6</div>
+        <div class="tick done">v7</div>
+        <div class="tick">v8</div>
+        <div class="tick">v9</div>
+        <div class="tick">v10</div>
+        <div class="tick">v11</div>
+        <div class="tick">v12</div>
+      </div>
+      <div class="legend">
+        <span>shipped · pipeline complete on real traffic</span>
+        <span>remaining · hardening and proof</span>
+      </div>
     </div>
   </header>
 
-  <section class="reveal">
-    <div class="section-head">
-      <span class="idx">01</span>
+  <section>
+    <div class="head">
       <h2>The loop</h2>
+      <span class="eyebrow">every stage now runs on real traffic</span>
     </div>
-    <p style="color:var(--muted);max-width:60ch;margin-bottom:22px">
-      Five stages. v1 builds every one of them for real — only the data
-      source at the front is synthetic.</p>
+
     <div class="pipe">
-      <div class="stage mock">
-        <div class="n">01</div><div class="name">Capture</div>
-        <div class="tag">mock plugin</div><div class="bar"></div>
+      <div class="stage">
+        <div class="n">01</div>
+        <h3>Capture</h3>
+        <p>A reverse proxy records the request and response; SQLAlchemy listeners inside the app record the queries it runs.</p>
       </div>
-      <div class="stage real">
-        <div class="n">02</div><div class="name">Correlate</div>
-        <div class="tag">one correlation_id</div><div class="bar"></div>
+      <div class="stage">
+        <div class="n">02</div>
+        <h3>Correlate</h3>
+        <p>One correlation id travels from proxy to app, so every query knows which request caused it.</p>
       </div>
-      <div class="stage real">
-        <div class="n">03</div><div class="name">Store</div>
-        <div class="tag">metadata + blobs</div><div class="bar"></div>
+      <div class="stage">
+        <div class="n">03</div>
+        <h3>Store</h3>
+        <p>Metadata in Postgres, payload snapshots in blob storage, secrets masked before either.</p>
       </div>
-      <div class="stage real">
-        <div class="n">04</div><div class="name">Replay</div>
-        <div class="tag">against mock target</div><div class="bar"></div>
+      <div class="stage">
+        <div class="n">04</div>
+        <h3>Replay</h3>
+        <p>The recorded requests are re-sent at a live service — one at a time, or concurrently to reproduce a race.</p>
       </div>
-      <div class="stage real">
-        <div class="n">05</div><div class="name">Compare</div>
-        <div class="tag">per-field diff</div><div class="bar"></div>
+      <div class="stage">
+        <div class="n">05</div>
+        <h3>Compare</h3>
+        <p>Matched event pairs are diffed after fresh ids and clocks are normalised away.</p>
       </div>
     </div>
   </section>
 
-  <section class="reveal">
-    <div class="section-head">
-      <span class="idx">02</span>
-      <h2>Where v1 stands</h2>
+  <section>
+    <div class="head">
+      <h2>What changed</h2>
+      <span class="eyebrow">v1 was the demo · v2–v7 made it real</span>
     </div>
-    <div class="grid-2">
-      <div class="card">
-        <h3>Real &amp; exercised</h3>
+
+    <div class="cols">
+      <div class="col">
+        <span class="eyebrow">Already built</span>
+        <h3>v1 — the pipeline, on synthetic data</h3>
+        <p style="font-size:0.88rem;color:var(--muted);margin-top:6px">
+          Every layer the product needs was real; only the data source was fake.
+        </p>
         <ul>
-          <li><span class="m">·</span> Versioned <b>Event</b> schema + migration registry</li>
-          <li><span class="m">·</span> Entry-point <b>plugin registry</b> — 5 built-ins, no core imports a plugin</li>
-          <li><span class="m">·</span> Async SQLAlchemy metadata store + Alembic</li>
-          <li><span class="m">·</span> Filesystem blob storage for recording snapshots</li>
-          <li><span class="m">·</span> Default redaction — <span class="mono">Authorization</span>, cookies, card tokens</li>
-          <li><span class="m">·</span> Replay engine with production-target safety check</li>
-          <li><span class="m">·</span> Comparison engine — <span class="mono">MATCH / DIFFERENT / MISSING / NEW / ERROR</span></li>
-          <li><span class="m">·</span> FastAPI + <span class="mono">infractl</span> CLI + NiceGUI dashboard</li>
+          <li><b>Event schema</b> with versioning and a migration registry.</li>
+          <li><b>Plugin registry</b> loading entry points, validating each against its ABC — no core code imports a plugin.</li>
+          <li><b>Mock capture</b> generating a believable checkout, clean and buggy.</li>
+          <li><b>Replay + comparison engines</b>, filesystem storage, default redaction.</li>
+          <li><b>API, CLI and dashboard</b> — one source of truth, two thin clients.</li>
         </ul>
       </div>
-      <div class="card mocked">
-        <h3>Mocked at v1 — on purpose</h3>
+
+      <div class="col now">
+        <span class="eyebrow">This push</span>
+        <h3>v2 – v7 — the same pipeline, on real traffic</h3>
+        <p style="font-size:0.88rem;color:var(--muted);margin-top:6px">
+          Nothing above the capture layer was rewritten. That was the bet v1 made.
+        </p>
         <ul>
-          <li><span class="m">·</span> <b>Capture.</b> <span class="mono">MockCapturePlugin</span> emits a full
-            transactional checkout — no real network or DB traffic</li>
-          <li><span class="m">·</span> <b>Replay target <span class="mono">mock</span>.</b> Deterministic; always
-            returns the clean outcome</li>
-          <li><span class="m">·</span> Everything downstream of capture is the code v2/v3 will keep</li>
+          <li><span class="vtag">v2</span><b>HTTP capture.</b> A Starlette reverse proxy with body limits; real headers redacted on the way in.</li>
+          <li><span class="vtag">v3</span><b>SQL capture + correlation.</b> In-app SQLAlchemy listeners; the app streams its queries back before the response leaves.</li>
+          <li><span class="vtag">v4</span><b>Live replay.</b> Requests really sent, real answers recorded, dynamic values substituted, races reproducible.</li>
+          <li><span class="vtag">v5</span><b>Comparison hardening.</b> Generated ids, UUIDs, timestamps and per-hop headers normalised before the diff.</li>
+          <li><span class="vtag">v6</span><b>Demo shop + a real bug.</b> A checkout that oversells under concurrency, and a one-line fix to switch it off.</li>
+          <li><span class="vtag">v7</span><b>Export / import.</b> A recording leaves as one file and replays on another instance.</li>
         </ul>
-        <p style="color:var(--muted);font-size:0.86rem;margin-top:16px">
-          The README says this in plain terms — v1 is an honest prototype
-          of the concept, not a finished product.</p>
-      </div>
-    </div>
-
-    <div class="result">
-      <div>
-        <div class="eyebrow" style="margin-bottom:6px">Definition of done</div>
-        <div class="verdict">Replay the buggy checkout → the incident reproduces.</div>
-      </div>
-      <div class="meter">
-        <div class="row"><span style="color:var(--good)">MATCH</span>
-          <span class="track"><span class="fill match" style="width:66%"></span></span> 4</div>
-        <div class="row"><span style="color:var(--amber)">DIFFERENT</span>
-          <span class="track"><span class="fill diff" style="width:34%"></span></span> 2</div>
-        <div class="row" style="color:var(--dim)">auth · order · items · inventory match;
-          payment &amp; response differ</div>
       </div>
     </div>
   </section>
 
-  <section class="reveal">
-    <div class="section-head">
-      <span class="idx">03</span>
-      <h2>What I'm doing now</h2>
+  <section>
+    <div class="head">
+      <h2>Does it actually work</h2>
+      <span class="eyebrow">recorded from a live run, not written by hand</span>
     </div>
-    <div class="now">
-      <div class="item">
-        <div class="k">Demo data</div>
-        <div class="v"><b>Made the synthetic capture look production-real.</b> One request now
-          fans out to auth <span class="mono">SELECT</span> → <span class="mono">BEGIN</span> →
-          <span class="mono">INSERT orders</span> → <span class="mono">INSERT order_items</span> →
-          <span class="mono">UPDATE inventory</span> → <span class="mono">INSERT payments</span> →
-          <span class="mono">COMMIT</span>, with real headers, params, totals and per-step timing.
-          The buggy run declines the card and rolls back.</div>
+
+    <p style="margin-bottom:20px">
+      One unit in stock, two shoppers checking out at the same moment. The shop confirms
+      both orders — it oversells. The recording is then replayed against the buggy shop,
+      and against the fixed one.
+    </p>
+
+    <div class="term">
+      <div class="bar">infractl · capture → replay → compare</div>
+<pre><span class="cmd">$ infractl capture start --listen :8082 --upstream :3000</span>
+rec_3856638fb164  listening :8082 -&gt; http://127.0.0.1:3000
+
+<span class="dim"># two checkouts, fired together, through the proxy</span>
+<span class="cmd">$ curl localhost:3000/api/v1/orders</span>
+{"confirmed_orders": 2, "stock_left": 1}      <span class="warn">&lt;- one unit sold twice</span>
+
+<span class="cmd">$ infractl capture stop rec_3856638fb164</span>
+rec_3856638fb164  [completed]  32 events
+
+<span class="cmd">$ infractl replay rec_3856638fb164 --target http://127.0.0.1:3000 --concurrency 2</span>
+summary: {'MATCH': 16, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
+<span class="dim"># replayed against the buggy shop: the bug reproduces exactly</span>
+
+<span class="dim"># fix the reservation, replay the same recording again</span>
+<span class="cmd">$ DEMO_SHOP_LOCK_INVENTORY=1 uvicorn examples.demo_shop.app:app --port 3000</span>
+<span class="cmd">$ infractl replay rec_3856638fb164 --target http://127.0.0.1:3000 --concurrency 2</span>
+summary: {'MATCH': 12, 'DIFFERENT': 2, 'MISSING': 2, 'NEW': 0, 'ERROR': 0}
+
+DIFFERENT  postgres.result  rows_affected 1 -&gt; 0
+DIFFERENT  http.response    status 201 -&gt; 409  body: {'error': 'out_of_stock'}   <span class="ok">&lt;- the fix, named</span>
+</pre>
+    </div>
+
+    <p style="margin-top:18px">
+      The comparison does not just say "something changed". It says the reserving
+      <span class="mono">UPDATE</span> now matches no row, and the second shopper is turned
+      away instead of being sold stock that does not exist.
+    </p>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>How capture crosses two processes</h2>
+      <span class="eyebrow">the part that was harder than the sketch</span>
+    </div>
+
+    <figure class="figure">
+      <svg viewBox="0 0 700 250" role="img" aria-label="A client calls the capture proxy, which forwards to the app carrying a correlation id; the app's agent posts its SQL events to the ingest API before the response returns, and both streams land in one recording.">
+        <defs>
+          <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <g fill="none" stroke="currentColor" color="var(--dim)" stroke-width="1.4">
+          <line x1="96" y1="46" x2="182" y2="46" marker-end="url(#ar)"></line>
+          <line x1="318" y1="46" x2="404" y2="46" marker-end="url(#ar)"></line>
+          <line x1="250" y1="76" x2="250" y2="176" marker-end="url(#ar)"></line>
+          <path d="M470 76 L470 140 L370 140" marker-end="url(#ar)"></path>
+          <line x1="330" y1="176" x2="330" y2="176"></line>
+        </g>
+
+        <g font-family="IBM Plex Mono, ui-monospace, Menlo, monospace" font-size="11">
+          <g>
+            <rect x="16" y="28" width="80" height="36" rx="7" fill="var(--sunk)" stroke="var(--line)"></rect>
+            <text x="56" y="51" text-anchor="middle" fill="var(--muted)">client</text>
+          </g>
+
+          <g>
+            <rect x="182" y="24" width="136" height="44" rx="8" fill="var(--signal-soft)" stroke="var(--signal)"></rect>
+            <text x="250" y="42" text-anchor="middle" fill="var(--signal)">capture proxy</text>
+            <text x="250" y="58" text-anchor="middle" fill="var(--muted)" font-size="10">http.request / response</text>
+          </g>
+
+          <g>
+            <rect x="404" y="24" width="136" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"></rect>
+            <text x="472" y="42" text-anchor="middle" fill="var(--text)">demo_shop</text>
+            <text x="472" y="58" text-anchor="middle" fill="var(--muted)" font-size="10">SQLAlchemy listeners</text>
+          </g>
+
+          <g>
+            <rect x="200" y="176" width="300" height="52" rx="8" fill="var(--panel)" stroke="var(--line)"></rect>
+            <text x="350" y="198" text-anchor="middle" fill="var(--text)">one recording</text>
+            <text x="350" y="214" text-anchor="middle" fill="var(--muted)" font-size="10">grouped by correlation id, ordered by clock</text>
+          </g>
+
+          <text x="250" y="18" text-anchor="middle" fill="var(--dim)" font-size="10">x-infrareplay-correlation-id</text>
+          <text x="386" y="132" text-anchor="end" fill="var(--dim)" font-size="10">POST /api/captures/{id}/events</text>
+          <text x="262" y="126" fill="var(--dim)" font-size="10">append</text>
+        </g>
+      </svg>
+      <figcaption>
+        The proxy sees HTTP; only the application sees its own queries. The agent flushes
+        them <em>before</em> the response leaves the app, so the proxy can never record a
+        response whose database events have not landed yet — no polling, no sleeping, no
+        lost events. If InfraReplay is down, the flush fails quietly and the app still
+        serves its request.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>Roadmap</h2>
+      <span class="eyebrow">v1 → v12</span>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Ver</th><th>Scope</th><th>State</th></tr>
+        </thead>
+        <tbody>
+          <tr class="shipped"><td class="v">v1</td><td>Full pipeline on synthetic data</td><td><span class="state on">Shipped</span></td></tr>
+          <tr class="shipped"><td class="v">v2</td><td>Real HTTP capture plugin</td><td><span class="state on">Shipped</span></td></tr>
+          <tr class="shipped"><td class="v">v3</td><td>Real SQL capture and correlation</td><td><span class="state on">Shipped</span></td></tr>
+          <tr class="shipped"><td class="v">v4</td><td>Replay against live targets</td><td><span class="state on">Shipped</span></td></tr>
+          <tr class="shipped"><td class="v">v5</td><td>Comparison hardening against real-world noise</td><td><span class="state on">Shipped</span></td></tr>
+          <tr class="shipped"><td class="v">v6</td><td>Demo shop with an intentional concurrency bug</td><td><span class="state on">Shipped</span></td></tr>
+          <tr class="shipped"><td class="v">v7</td><td>CLI completeness, export and import</td><td><span class="state on">Shipped</span></td></tr>
+          <tr><td class="v">v8</td><td>Security hardening — encryption at rest, API keys, audit log</td><td><span class="state">Planned</span></td></tr>
+          <tr><td class="v">v9</td><td>Observability — Prometheus metrics, structured logs</td><td><span class="state">Planned</span></td></tr>
+          <tr><td class="v">v10</td><td>Benchmark suite with published methodology</td><td><span class="state">Planned</span></td></tr>
+          <tr><td class="v">v11</td><td>External service mocking during replay</td><td><span class="state">Planned</span></td></tr>
+          <tr><td class="v">v12</td><td>A third-party protocol plugin, installed separately</td><td><span class="state">Planned</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>Running the demo</h2>
+      <span class="eyebrow">four terminals, five minutes</span>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <span class="num"></span>
+        <div>
+          <p>Start the three services — or <span class="mono">docker compose up --build</span> for all of them at once.</p>
+          <code>uvicorn infrareplay.api.app:app --port 8000
+uvicorn examples.demo_shop.app:app --port 3000
+python -m infrareplay.dashboard.app</code>
+        </div>
       </div>
-      <div class="item">
-        <div class="k">Dashboard</div>
-        <div class="v"><b>Rebuilt the UI around the timeline.</b> Request waterfall with duration
-          bars, every event expandable to its SQL / headers / body, and a
-          captured-vs-replayed comparison view that shows the exact fields that changed.</div>
+
+      <div class="step">
+        <span class="num"></span>
+        <div>
+          <p>Seed the synthetic recordings, so there is something to show before any traffic exists.</p>
+          <code>infractl demo seed</code>
+        </div>
       </div>
-      <div class="item">
-        <div class="k">This deck</div>
-        <div class="v">Standing status page for the presentation — progress, the loop, and the
-          road ahead in one place.</div>
+
+      <div class="step">
+        <span class="num"></span>
+        <div>
+          <p>Record real traffic: start the proxy, send a checkout through it, stop.</p>
+          <code>infractl capture start --listen :8081 --upstream :3000
+curl -X POST localhost:8081/api/v1/checkout -H 'x-demo-user: dana' -H 'authorization: Bearer secret' -d '{...}'
+infractl capture stop &lt;recording-id&gt;</code>
+        </div>
       </div>
-      <div class="item">
-        <div class="k">Next</div>
-        <div class="v">Start <b>v2</b>: a real Starlette reverse-proxy capture plugin that drops
-          into the exact pipeline above — nothing downstream changes.</div>
+
+      <div class="step">
+        <span class="num"></span>
+        <div>
+          <p>Open the dashboard at <span class="mono">localhost:8080</span>: the request waterfall, each query expandable, the masked <span class="mono">Authorization</span> header.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <span class="num"></span>
+        <div>
+          <p>Replay it at the live shop, then at a production-looking host to show the refusal.</p>
+          <code>infractl replay &lt;id&gt; --target http://127.0.0.1:3000
+infractl replay &lt;id&gt; --target https://api.production.example.com</code>
+        </div>
+      </div>
+
+      <div class="step">
+        <span class="num"></span>
+        <div>
+          <p>Run the oversell story from <span class="mono">docs/v6.md</span> — capture the race, reproduce it, fix it, replay again.</p>
+        </div>
       </div>
     </div>
   </section>
 
-  <section class="reveal">
-    <div class="section-head">
-      <span class="idx">04</span>
-      <h2>Roadmap · v1 → v12</h2>
+  <section>
+    <div class="head">
+      <h2>What it does not do yet</h2>
+      <span class="eyebrow">stated, not hidden</span>
     </div>
-    <p style="color:var(--muted);max-width:58ch;margin-bottom:24px">
-      Each version ends in a state you can <span class="mono">docker compose up</span> and demo.
-      No version depends on unfinished work from a later one.</p>
 
-    <div class="road">
-      <div class="ver done">
-        <div class="tick">v1</div>
-        <div class="body">
-          <div>
-            <h3>Full pipeline demo</h3>
-            <p>Schema, registry, storage, replay, comparison, API, CLI, dashboard — end to end on synthetic capture.</p>
-          </div>
-          <span class="state">Shipped</span>
-        </div>
+    <div class="limits">
+      <div class="limit">
+        <p><b>BEGIN and COMMIT are not captured.</b> They are issued on the connection rather than through a cursor, so the SQLAlchemy listener never sees them. Every statement inside the transaction is captured.</p>
       </div>
-      <div class="ver next">
-        <div class="tick">v2</div>
-        <div class="body">
-          <div>
-            <h3>Real HTTP capture</h3>
-            <p>Starlette reverse proxy: correlation IDs, header/body redaction, size limits, recording lifecycle.</p>
-          </div>
-          <span class="state">Next</span>
-        </div>
+      <div class="limit">
+        <p><b>Result rows are not read back.</b> Reading a cursor would consume it, so results record <span class="mono">rows_affected</span> and whether the statement returned rows.</p>
       </div>
-      <div class="ver">
-        <div class="tick">v3</div>
-        <div class="body">
-          <div><h3>Real PostgreSQL capture + correlation</h3>
-          <p>SQLAlchemy event listeners; the in-flight request's correlation ID follows every query via contextvars.</p></div>
-          <span class="state">Planned</span>
-        </div>
+      <div class="limit">
+        <p><b>A race only reproduces under concurrency.</b> Replayed one request at a time, the second checkout simply finds the shelf empty — <span class="mono">--concurrency</span> is what makes the recorded race reproducible.</p>
       </div>
-      <div class="ver">
-        <div class="tick">v4</div>
-        <div class="body">
-          <div><h3>Real replay engine</h3>
-          <p>Replay captured recordings against a live target; substitution engine for UUIDs and timestamps.</p></div>
-          <span class="state">Planned</span>
-        </div>
+      <div class="limit">
+        <p><b>No performance claims.</b> The benchmark suite is v10; until it exists, no numbers are published — that rule comes from the spec and it still holds.</p>
       </div>
-      <div class="ver">
-        <div class="tick">v5</div>
-        <div class="body">
-          <div><h3>Comparison hardening</h3>
-          <p>Robust against timestamp jitter, non-deterministic IDs and latency — no false <span class="mono">DIFFERENT</span>s.</p></div>
-          <span class="state">Planned</span>
-        </div>
-      </div>
-      <div class="ver">
-        <div class="tick">v6</div>
-        <div class="body">
-          <div><h3>Demo shop + intentional bug</h3>
-          <p>A real FastAPI + Postgres app with a concurrent inventory-reservation bug to catch on replay.</p></div>
-          <span class="state">Planned</span>
-        </div>
-      </div>
-      <div class="ver">
-        <div class="tick">v7</div>
-        <div class="body">
-          <div><h3>CLI completeness + export/import</h3>
-          <p>Export a recording to one file, re-import it into a fresh instance, replay it there.</p></div>
-          <span class="state">Planned</span>
-        </div>
-      </div>
-      <div class="ver">
-        <div class="tick">v8</div>
-        <div class="body">
-          <div><h3>Security hardening</h3>
-          <p>Blob encryption at rest, API keys, audit log; tests assert secrets never reach storage or the API.</p></div>
-          <span class="state">Planned</span>
-        </div>
-      </div>
-      <div class="ver">
-        <div class="tick">v9</div>
-        <div class="body">
-          <div><h3>Observability</h3>
-          <p>Prometheus metrics and structured logs; a Grafana-importable dashboard in <span class="mono">docs/</span>.</p></div>
-          <span class="state">Planned</span>
-        </div>
-      </div>
-      <div class="ver">
-        <div class="tick">v10</div>
-        <div class="body">
-          <div><h3>Benchmark suite</h3>
-          <p>Locust load against the demo shop with capture on and off; publish the method, not just numbers.</p></div>
-          <span class="state">Planned</span>
-        </div>
-      </div>
-      <div class="ver">
-        <div class="tick">v11</div>
-        <div class="body">
-          <div><h3>External service mocking</h3>
-          <p>Payment / email / SMS / shipping stubs so replay never touches a real third party by default.</p></div>
-          <span class="state">Planned</span>
-        </div>
-      </div>
-      <div class="ver">
-        <div class="tick">v12</div>
-        <div class="body">
-          <div><h3>Post-MVP plugin: Kafka capture</h3>
-          <p>A separately <span class="mono">pip install</span>ed package that registers itself with zero core changes.</p></div>
-          <span class="state">Planned</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="reveal">
-    <div class="section-head">
-      <span class="idx">05</span>
-      <h2>How it's built</h2>
-    </div>
-    <div class="grid-3">
-      <div class="card prin">
-        <h3>Plugins, not forks</h3>
-        <p>Capture sources, storage, redaction and comparators are entry-point plugins.
-          The core talks to interfaces only — the mock capture proves it.</p>
-      </div>
-      <div class="card prin">
-        <h3>The schema is the API</h3>
-        <p>Every component agrees on one Pydantic <span class="mono">Event</span> with a
-          <span class="mono">schema_version</span>. New fields are additive; breaking changes get a migration.</p>
-      </div>
-      <div class="card prin">
-        <h3>Safe by default</h3>
-        <p>Replay refuses production-looking targets without an override.
-          Redaction masks credentials on every captured event.</p>
+      <div class="limit">
+        <p><b>Security is v8.</b> Recordings are redacted but not encrypted at rest, and the API has no access control yet.</p>
       </div>
     </div>
   </section>
 
   <footer>
-    <div class="stack">FastAPI · Typer · Pydantic v2 · SQLAlchemy 2.0 async · Alembic · NiceGUI · httpx · structlog · pytest</div>
-    <div>InfraReplay — Python rewrite. College demo prototype: capture is mocked at v1, and the README says so.</div>
+    <span>InfraReplay · capture → correlate → store → replay → compare</span>
+    <span>docs/roadmap.md · docs/v1.md … docs/v7.md</span>
   </footer>
 
 </div>
-
-<script>
-  (function () {
-    var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce || !("IntersectionObserver" in window)) {
-      document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("in"); });
-      return;
-    }
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
-      });
-    }, { threshold: 0.12 });
-    document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
-  })();
-</script>
+</body>
+</html>

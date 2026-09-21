@@ -297,3 +297,51 @@ The plugin registry loads plugins from whatever's installed in the
    correlation system.
 5. **Every version is a real, running system.** No version's "done"
    state includes code that doesn't work yet — see the roadmap doc.
+---
+
+## 9. As Built (v1 → v7)
+
+Two things in §3–§5 turned out to need more than the sketch, and both are
+worth knowing before reading the code.
+
+### 9.1 Capture crosses a process boundary
+
+HTTP capture runs in the InfraReplay process (a reverse proxy); SQL capture
+runs *inside the target application* (SQLAlchemy listeners). They are two
+producers writing into one recording, and they do not share memory:
+
+```
+  client ──> ReverseProxy ──(recording id, correlation id)──> app
+                 │                                             │ SQL
+                 │ http.request / http.response        capture plugin queue
+                 ▼                                             │
+          capture session ────────> recording <──── POST /api/captures/{id}/events
+```
+
+The app-side half (`infrareplay/agent/`) flushes its queue **before the
+response leaves the app**, so the proxy never records a response whose
+database events have not arrived. No polling, no sleeps, no lost events —
+and if InfraReplay is down, the flush fails quietly and the app still
+serves its request.
+
+Because arrival order is not causal order, `recording/correlate.py` groups
+events by `correlation_id`, orders each group by `timestamp_ns`,
+re-sequences the whole recording gap-free, and parents the DB events to the
+request that caused them. This runs once, when the recording is finalised.
+
+### 9.2 A replay is a recording, opened before it runs
+
+`run_replay` opens the replay recording *first*, then sends requests
+carrying that recording's id. An instrumented target therefore streams its
+SQL into the replay run while it is still in flight, and the comparison can
+diff database work, not just status codes. The same lifecycle
+(`start_recording → append_events → finish_recording`) serves capture and
+replay, which is why both end up correlated and sequenced identically.
+
+### 9.3 Comparison needs a notion of "same enough"
+
+Real runs differ by construction: new order ids, new payment references, a
+new clock. `comparison/normalize.py` rewrites those to `<id>`, `<uuid>`,
+`<timestamp>` and drops volatile headers before either comparator diffs.
+Everything else is compared exactly — a 201 that became a 409 is still a
+difference, and the tests assert both directions.
