@@ -1,7 +1,7 @@
 import pytest
 
 from infrareplay.plugins.redaction_default.plugin import REDACTED
-from infrareplay.recording import capture_recording, get_recording
+from infrareplay.recording import capture_recording, get_recording, list_recordings
 from infrareplay.replay.engine import ReplayError, SafetyMode
 from infrareplay.replay.runner import run_replay
 from infrareplay.schema import RecordingStatus
@@ -53,3 +53,13 @@ async def test_replay_refuses_production_target():
             recording_id=clean.recording_id,
             target="https://api.production.example.com",
         )
+
+
+async def test_refused_replay_leaves_no_recording_behind():
+    clean = await _capture("clean")
+    before = len(await list_recordings())
+
+    with pytest.raises(ReplayError):
+        await run_replay(recording_id=clean.recording_id, target="https://prod.example.com")
+
+    assert len(await list_recordings()) == before
