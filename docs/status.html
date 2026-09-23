@@ -683,24 +683,24 @@ DIFFERENT  http.response    status 201 -&gt; 409  body: {'error': 'out_of_stock'
   <section>
     <div class="head">
       <h2>Running the demo</h2>
-      <span class="eyebrow">four terminals, five minutes</span>
+      <span class="eyebrow">one container, five minutes</span>
     </div>
 
     <div class="steps">
       <div class="step">
         <span class="num"></span>
         <div>
-          <p>Start the three services — or <span class="mono">docker compose up --build</span> for all of them at once.</p>
-          <code>uvicorn infrareplay.api.app:app --port 8000
-uvicorn examples.demo_shop.app:app --port 3000
-python -m infrareplay.dashboard.app</code>
+          <p>Start everything — API, demo shop and dashboard — in one container.</p>
+          <code>docker build -t infrareplay .
+docker run --rm --name infrareplay -p 8000:8000 -p 8080:8080 -p 3000:3000 -p 8081:8081 -v infrareplay-data:/data infrareplay</code>
+          <p style="margin-top:8px">Without Docker, the same three processes: <span class="mono">uvicorn infrareplay.api.app:app --port 8000</span>, <span class="mono">uvicorn examples.demo_shop.app:app --port 3000</span>, <span class="mono">python -m infrareplay.dashboard.app</span>.</p>
         </div>
       </div>
 
       <div class="step">
         <span class="num"></span>
         <div>
-          <p>Seed the synthetic recordings, so there is something to show before any traffic exists.</p>
+          <p>The fixture recordings are seeded on boot. To reseed by hand, or outside Docker:</p>
           <code>infractl demo seed</code>
         </div>
       </div>
@@ -708,7 +708,7 @@ python -m infrareplay.dashboard.app</code>
       <div class="step">
         <span class="num"></span>
         <div>
-          <p>Record real traffic: start the proxy, send a checkout through it, stop.</p>
+          <p>Record real traffic: start the proxy, send a checkout through it, stop. Prefix each with <span class="mono">docker exec -it infrareplay</span> when running in Docker.</p>
           <code>infractl capture start --listen :8081 --upstream :3000
 curl -X POST localhost:8081/api/v1/checkout -H 'x-demo-user: dana' -H 'authorization: Bearer secret' -d '{...}'
 infractl capture stop &lt;recording-id&gt;</code>

@@ -39,17 +39,51 @@ uvicorn examples.demo_shop.app:app --port 3000
 python -m infrareplay.dashboard.app        # http://127.0.0.1:8080
 ```
 
-## Quick start (Docker)
+## Quick start (Docker — one command)
+
+Backend, demo shop and dashboard in a single container, seeded on boot:
+
+```bash
+docker build -t infrareplay . && docker run --rm --name infrareplay \
+  -p 8000:8000 -p 8080:8080 -p 3000:3000 -p 8081:8081 \
+  -v infrareplay-data:/data infrareplay
+```
+
+Then open **http://localhost:8080**.
+
+| Port | What |
+|---|---|
+| 8080 | dashboard — the frontend |
+| 8000 | API (`/docs` for OpenAPI) |
+| 3000 | demo shop, the app being recorded |
+| 8081 | where `infractl capture start --listen :8081` listens |
+
+Recordings live in the `infrareplay-data` volume, so they survive a
+restart. Drive the CLI inside the running container:
+
+```bash
+docker exec -it infrareplay infractl recordings list
+docker exec -it infrareplay infractl capture start --listen :8081 --upstream :3000
+docker exec -it infrareplay infractl replay <recording-id> --target http://127.0.0.1:3000
+```
+
+Stop it with `Ctrl-C`, or `docker stop infrareplay` from another terminal.
+
+## Quick start (Docker Compose — separate services + Postgres)
 
 ```bash
 docker compose up --build
-infractl demo seed
 ```
 
-- API: http://localhost:8000  (`/docs` for OpenAPI)
-- Dashboard: http://localhost:8080
-- Demo shop: http://localhost:3000
-- Capture proxy: http://localhost:8081 (`--listen :8081`)
+Same ports, but each service is its own container and the metadata store
+is Postgres instead of SQLite. `INFRAREPLAY_ROLE` (`api` · `shop` ·
+`dashboard` · `all`) is what selects a role from the one image.
+
+To demo the inventory fix, restart the shop with the flag set:
+
+```bash
+DEMO_SHOP_LOCK_INVENTORY=1 docker compose up -d --force-recreate shop
+```
 
 ## Demo transcript
 

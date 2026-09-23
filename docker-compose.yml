@@ -1,3 +1,12 @@
+# The full stack, each service the same image in a different role.
+#
+#   docker compose up --build
+#
+# Single container instead (no Postgres, nothing else to install):
+#
+#   docker build -t infrareplay .
+#   docker run --rm -p 8000:8000 -p 8080:8080 -p 3000:3000 -p 8081:8081 infrareplay
+
 services:
   postgres:
     image: postgres:17
@@ -15,8 +24,8 @@ services:
 
   api:
     build: .
-    command: uvicorn infrareplay.api.app:app --host 0.0.0.0 --port 8000
     environment:
+      INFRAREPLAY_ROLE: api
       INFRAREPLAY_DATABASE_URL: postgresql+asyncpg://infrareplay:infrareplay@postgres:5432/infrareplay
       INFRAREPLAY_BLOB_ROOT: /data/blobs
     volumes:
@@ -31,8 +40,8 @@ services:
 
   shop:
     build: .
-    command: uvicorn examples.demo_shop.app:app --host 0.0.0.0 --port 3000
     environment:
+      INFRAREPLAY_ROLE: shop
       # Shares the Postgres instance; its tables do not overlap InfraReplay's.
       DEMO_SHOP_DATABASE_URL: postgresql+asyncpg://infrareplay:infrareplay@postgres:5432/infrareplay
       INFRAREPLAY_API_URL: http://api:8000
@@ -46,14 +55,26 @@ services:
 
   dashboard:
     build: .
-    command: python -m infrareplay.dashboard.app
     environment:
+      INFRAREPLAY_ROLE: dashboard
       INFRAREPLAY_API_URL: http://api:8000
       INFRAREPLAY_DASHBOARD_PORT: "8080"
     ports:
       - "8080:8080"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+
+  # One-shot: seeds the fixture recordings once the API is up, then exits.
+  seed:
+    build: .
+    command: ["python", "/app/docker/seed.py"]
+    environment:
+      INFRAREPLAY_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   blobs:
