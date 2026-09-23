@@ -75,15 +75,30 @@ Stop it with `Ctrl-C`, or `docker stop infrareplay` from another terminal.
 docker compose up --build
 ```
 
-Same ports, but each service is its own container and the metadata store
-is Postgres instead of SQLite. `INFRAREPLAY_ROLE` (`api` · `shop` ·
-`dashboard` · `all`) is what selects a role from the one image.
+Same ports on the host, but each service is its own container and the
+metadata store is Postgres instead of SQLite. `INFRAREPLAY_ROLE`
+(`api` · `shop` · `dashboard` · `all`) selects a role from the one image,
+and the fixture recordings are seeded by a one-shot `seed` service.
+
+Containers reach each other by service name, so here the upstream and the
+replay target are `http://shop:3000`, not `:3000`:
+
+```bash
+docker compose exec api infractl capture start --listen :8081 --upstream http://shop:3000
+# send the checkout to localhost:8081, then:
+docker compose exec api infractl capture stop <recording-id>
+docker compose exec api infractl replay <recording-id> --target http://shop:3000
+```
 
 To demo the inventory fix, restart the shop with the flag set:
 
 ```bash
 DEMO_SHOP_LOCK_INVENTORY=1 docker compose up -d --force-recreate shop
 ```
+
+Postgres is deliberately not published to the host — it would collide
+with any Postgres already running there. Tear the stack down with
+`docker compose down -v`.
 
 ## Demo transcript
 
