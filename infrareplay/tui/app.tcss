@@ -1,0 +1,170 @@
+/* InfraReplay TUI. Colours match the web dashboard and the status page:
+   teal = capture, indigo = replay, green/amber/red = match/different/missing. */
+
+Screen {
+    background: #0b0f19;
+}
+
+#status {
+    height: 1;
+    background: #111827;
+}
+
+TabbedContent {
+    height: 1fr;
+}
+
+.hint {
+    color: #64748b;
+    padding: 0 1;
+}
+
+DataTable {
+    height: 1fr;
+    border: round #334155;
+    border-title-color: #94a3b8;
+    background: #0b0f19;
+}
+
+DataTable > .datatable--header {
+    color: #94a3b8;
+    background: #111827;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: #1e293b;
+}
+
+/* ---- overview ---------------------------------------------------------- */
+
+.tiles {
+    height: 6;
+}
+
+.tile {
+    width: 1fr;
+    border: round #334155;
+    border-title-color: #94a3b8;
+    align: center middle;
+}
+
+.tile Digits {
+    width: auto;
+    color: #2dd4bf;
+}
+
+.sparks {
+    height: 8;
+}
+
+.spark {
+    width: 1fr;
+    border: round #334155;
+    border-title-color: #94a3b8;
+    padding: 0 1;
+}
+
+Sparkline {
+    height: 1fr;
+}
+
+Sparkline > .sparkline--max-color {
+    color: #2dd4bf;
+}
+
+Sparkline > .sparkline--min-color {
+    color: #1e3a3a;
+}
+
+#requests-spark > .sparkline--max-color {
+    color: #818cf8;
+}
+
+#mix {
+    height: auto;
+    border: round #334155;
+    border-title-color: #94a3b8;
+    padding: 0 1;
+}
+
+#recent-table {
+    height: 1fr;
+    min-height: 6;
+}
+
+/* ---- captures ---------------------------------------------------------- */
+
+#capture-form {
+    height: auto;
+    padding: 0 1;
+}
+
+#capture-form Input {
+    width: 1fr;
+}
+
+#capture-form #port {
+    width: 12;
+}
+
+/* ---- drill-down screens ------------------------------------------------ */
+
+#summary, #verdict, #counts {
+    height: auto;
+    padding: 0 1;
+}
+
+#verdict {
+    padding-top: 1;
+}
+
+.split {
+    height: 1fr;
+}
+
+#events, #pairs {
+    width: 3fr;
+}
+
+#inspector {
+    width: 2fr;
+    border: round #334155;
+    border-title-color: #94a3b8;
+    padding: 0 1;
+}
+
+/* ---- replay dialog ----------------------------------------------------- */
+
+ReplayDialog {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+#dialog {
+    width: 76;
+    height: auto;
+    border: thick #818cf8;
+    background: #111827;
+    padding: 1 2;
+}
+
+#dialog-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#dialog .hint {
+    padding: 0;
+    margin-top: 1;
+}
+
+#dialog-buttons {
+    height: auto;
+    align-horizontal: right;
+    margin-top: 1;
+}
+
+#dialog-buttons Button {
+    margin-left: 1;
+}

@@ -21,6 +21,7 @@ dependencies = [
     "structlog",
     "cryptography",
     "prometheus-client",
+    "textual",
 ]
 
 [project.optional-dependencies]
@@ -44,6 +45,10 @@ postgres_comparator = "infrareplay.plugins.comparators.postgres:PostgresComparat
 
 [tool.setuptools.packages.find]
 include = ["infrareplay*"]
+
+# The TUI stylesheet ships inside the package.
+[tool.setuptools.package-data]
+infrareplay = ["tui/*.tcss"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

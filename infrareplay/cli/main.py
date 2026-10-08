@@ -168,6 +168,19 @@ def projects_list() -> None:
         typer.echo(f"{row['project']:<20} {row['recordings']:>3} recordings  {row['last_activity']}")
 
 
+# --------------------------------------------------------------------- tui
+
+
+@app.command("tui")
+def tui() -> None:
+    """Open the terminal UI: live metrics, recordings, replays, captures, audit."""
+
+    # Imported here so every other command starts without loading Textual.
+    from infrareplay.tui.app import main
+
+    main()
+
+
 # ------------------------------------------------------------------- audit
 
 
