@@ -2,6 +2,10 @@
 #
 #   docker compose up --build
 #
+# With Prometheus (:9090) and Grafana (:3001, dashboard preloaded):
+#
+#   docker compose --profile observability up --build
+#
 # Single container instead (no Postgres, nothing else to install):
 #
 #   docker build -t infrareplay .
@@ -76,6 +80,36 @@ services:
       api:
         condition: service_healthy
     restart: "no"
+
+  # ---- v9, opt-in: docker compose --profile observability up --build ------
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    profiles: ["observability"]
+    volumes:
+      - ./docs/grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    profiles: ["observability"]
+    environment:
+      # Read-only anonymous viewing, so the demo opens straight onto the dashboard.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/infrareplay-dashboard.json
+    volumes:
+      - ./docs/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docs/grafana/infrareplay-dashboard.json:/var/lib/grafana/dashboards/infrareplay-dashboard.json:ro
+    ports:
+      # 3000 is the demo shop.
+      - "3001:3000"
+    depends_on:
+      - prometheus
 
 volumes:
   blobs:

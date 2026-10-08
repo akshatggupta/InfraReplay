@@ -1,0 +1,10 @@
+# Scrapes the InfraReplay API. Used by `docker compose --profile observability up`.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: infrareplay
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]
