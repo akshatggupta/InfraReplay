@@ -1,4 +1,21 @@
-"""DefaultRedactionPlugin — masks known-sensitive header and body keys."""
+"""DefaultRedactionPlugin — masks secrets before an event is ever stored.
+
+Two nets, applied everywhere in the payload:
+
+  1. by key   — a value under `authorization`, `cookie`, `token`, `cvv`, …
+                is replaced whole, whatever it looks like;
+  2. by shape — a bearer token, a JWT or a provider key is masked wherever
+                it appears, including inside SQL parameter lists and
+                free-text fields that no key name would flag.
+
+    {"note": "retry with eyJhbGciOi.eyJzdWIi.c2lnbmF0dXJl"}
+        -> {"note": "retry with ***REDACTED***"}
+
+Shape matching cannot know every secret format; it catches the common ones
+that turn up in real traffic. Anything else needs its key on the list.
+"""
+
+import re
 
 from infrareplay.contracts import RedactionPlugin
 from infrareplay.schema import Event
@@ -22,6 +39,13 @@ _SENSITIVE_KEYS = frozenset(
     }
 )
 
+# Lengths are floors, so ordinary prose ("Bearer of good news") is left alone.
+_SECRET_SHAPES = (
+    re.compile(r"\bBearer\s+[A-Za-z0-9\-._~+/]{16,}=*", re.IGNORECASE),
+    re.compile(r"\beyJ[\w-]{4,}\.[\w-]{4,}\.[\w-]{4,}"),
+    re.compile(r"\b(?:sk|pk|rk|tok)_(?:live|test)_[A-Za-z0-9]{6,}"),
+)
+
 
 class DefaultRedactionPlugin(RedactionPlugin):
     name = "redaction_default"
@@ -39,6 +63,9 @@ class DefaultRedactionPlugin(RedactionPlugin):
         if isinstance(value, list):
             return [self._scrub(v) for v in value]
 
+        if isinstance(value, str):
+            return _mask_shapes(value)
+
         return value
 
     def _scrub_entry(self, key: str, value):
@@ -46,3 +73,10 @@ class DefaultRedactionPlugin(RedactionPlugin):
             return REDACTED
 
         return self._scrub(value)
+
+
+def _mask_shapes(text: str) -> str:
+    for shape in _SECRET_SHAPES:
+        text = shape.sub(REDACTED, text)
+
+    return text
