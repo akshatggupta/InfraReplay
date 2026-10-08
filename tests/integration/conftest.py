@@ -39,10 +39,21 @@ async def stack(tmp_path, monkeypatch):
 
 
 def client(server: LiveServer) -> httpx.AsyncClient:
-    return httpx.AsyncClient(base_url=server.url, timeout=_TIMEOUT_S)
+    # Sends the key whenever a test has turned API keys on (v8).
+    headers = {"x-api-key": config.API_KEY} if config.API_KEY else {}
+
+    return httpx.AsyncClient(base_url=server.url, timeout=_TIMEOUT_S, headers=headers)
 
 
-async def capture(api, shop, *, requests: int = 1, concurrent: bool = False) -> dict:
+async def capture(
+    api,
+    shop,
+    *,
+    requests: int = 1,
+    concurrent: bool = False,
+    headers: dict | None = None,
+    body: dict | None = None,
+) -> dict:
     """Record `requests` checkouts through a live capture proxy."""
 
     async with client(api) as api_client:
@@ -65,7 +76,7 @@ async def capture(api, shop, *, requests: int = 1, concurrent: bool = False) -> 
 
         async with httpx.AsyncClient(base_url=proxy, timeout=_TIMEOUT_S) as through:
             calls = [
-                through.post("/api/v1/checkout", json=CHECKOUT, headers=HEADERS)
+                through.post("/api/v1/checkout", json=body or CHECKOUT, headers=headers or HEADERS)
                 for _ in range(requests)
             ]
 
