@@ -1,5 +1,32 @@
 # 04 · Running it, and the demo script
 
+## The TUI
+
+```bash
+infractl tui      # needs the API running; honours INFRAREPLAY_API_URL / _API_KEY
+```
+
+`1`–`5` switch tabs (overview, recordings, captures, audit, plugins), `enter`
+opens, `r` replays / refreshes, `x` stops a capture, `e` exports, `q` quits.
+Full guide: `docs/tui.md`.
+
+## Observability stack
+
+```bash
+docker compose --profile observability up --build
+# Prometheus http://localhost:9090   Grafana http://localhost:3001
+```
+
+## Turning security on
+
+```bash
+export INFRAREPLAY_API_KEYS="ci:<secret>"      # server
+export INFRAREPLAY_API_KEY="<secret>"          # every client, incl. the demo shop's agent
+export INFRAREPLAY_STORAGE_PLUGIN=storage_encrypted
+export INFRAREPLAY_ENCRYPTION_KEY="$(infractl security keygen)"
+infractl audit list
+```
+
 ## Docker, one container (simplest)
 
 ```bash
@@ -73,11 +100,14 @@ The existing venv is at `.venv/` and already has everything, including
 | `infractl compare <replay-id>` | show a replay's comparison |
 | `infractl projects list` | recordings per project |
 | `infractl plugins list` | registered plugins |
+| `infractl tui` | the terminal UI |
+| `infractl audit list [--action …] [--recording …]` | audit log |
+| `infractl security keygen` | key for encryption at rest |
 
 ## Tests
 
 ```bash
-pytest                    # 34 passed, 1 skipped with nothing running
+pytest                    # 57 passed, 1 skipped with nothing running
 ```
 
 The skip is `tests/integration/test_dashboard_pages.py`, which renders every

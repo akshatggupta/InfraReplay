@@ -32,7 +32,10 @@ differences, all stated in `idea.md`:
 | Dashboard | NiceGUI (pure Python, no separate frontend build) |
 | Metadata store | SQLite locally, Postgres under Compose |
 | Blobs | filesystem `StoragePlugin` (`storage_fs`) |
-| Tests | pytest + pytest-asyncio |
+| Tests | pytest + pytest-asyncio; Textual Pilot for the TUI |
+| Security | cryptography (Fernet), constant-time API key check |
+| Metrics / logs | prometheus-client, structlog |
+| TUI | Textual |
 
 ## Package layout
 
@@ -52,6 +55,9 @@ infrareplay/
   api/          FastAPI
   cli/          Typer (infractl)
   dashboard/    NiceGUI
+  tui/          Textual — `infractl tui`
+  security/     API keys, audit log, encryption keys (v8)
+  observability/ Prometheus metrics, structlog JSON (v9)
 examples/demo_shop/   the recorded application, with its bug
 migrations/           Alembic
 docker/               entrypoint, boot seeding, healthcheck
@@ -62,14 +68,14 @@ docs/                 v1..v7 notes, roadmap, status.html
 
 ## The seven registered plugins
 
-`infractl plugins list` shows, by slot:
+`infractl plugins list` shows eight, by slot:
 
 - **capture** — `mock_capture`, `http_capture`, `postgres_capture`
-- **storage** — `storage_fs`
+- **storage** — `storage_fs`, `storage_encrypted` (wraps another by name, Fernet)
 - **redaction** — `redaction_default`
 - **comparator** — `http_comparator`, `postgres_comparator`
 
-All seven register through `pyproject.toml`'s
+All eight register through `pyproject.toml`'s
 `[project.entry-points."infrareplay.plugins"]`, exactly as a third-party
 package would. That is the architectural claim the project keeps making, and
 it held: adding real capture in v2/v3 changed nothing above the capture layer.
@@ -85,14 +91,15 @@ it held: adding real capture in v2/v3 changed nothing above the capture layer.
 | v5 | Comparison hardening | **done** |
 | v6 | Demo shop + intentional bug | **done** |
 | v7 | CLI completeness, export/import | **done** |
-| v8 | Security hardening (encryption at rest, API keys, audit log) | not started |
-| v9 | Observability (Prometheus, structlog JSON) | not started |
+| v8 | Security hardening (encryption at rest, API keys, audit log) | **done** (2026-10-08) |
+| v9 | Observability (Prometheus, structlog JSON) | **done** (2026-10-08) |
 | v10 | Benchmark suite (Locust, published methodology) | not started |
 | v11 | External service mocking on replay | not started |
 | v12 | Third-party protocol plugin as a separate package | not started |
 
-**7 of 12 ≈ 58%.** The user asked for "60% ready" for a college
-presentation; v2–v7 was the reading of that, and it is what shipped.
+**9 of 12 = 75%.** The user first asked for "60% ready" for a college
+presentation (v2–v7), then for "the next 2 versions" (v8, v9), then for
+"a cool TUI over all these" — `infractl tui`, see `docs/tui.md`.
 
 ## Docs that are the source of truth
 

@@ -8,7 +8,7 @@
 | Platform | WSL2 on Windows (`Linux 5.15.167.4-microsoft-standard-WSL2`) |
 | Python | 3.12.3, venv at `.venv/` (has `setuptools`, needed for `--no-build-isolation`) |
 | Git remote | `git@github.com:akshatggupta/InfraReplay.git` |
-| Branch | `main`, clean, in sync at `ee7a10c` |
+| Branch | `main` at `7bd18c0`; origin at `01fc4ec` — **12 commits unpushed** as of 2026-10-08 |
 | Docker | 27.2.0, Compose v2.29.2 — WSL integration had to be enabled in Docker Desktop |
 
 Local state files (all gitignored): `infrareplay.db`, `demo_shop.db`,
@@ -23,6 +23,8 @@ Local state files (all gitignored): `infrareplay.db`, `demo_shop.db`,
 | 3000 | demo shop | the app being recorded |
 | 8081 | capture proxy | only while a capture session is running |
 | 5432 | — | **taken by another container (`rss-db`)**; Compose no longer binds it |
+| 9090 | Prometheus | `--profile observability` only |
+| 3001 | Grafana | `--profile observability` only (3000 is the shop) |
 
 Other containers on this machine, unrelated: `rss-db` (5432),
 `vara5-pg-local-db-1` (55432).
@@ -43,6 +45,12 @@ Other containers on this machine, unrelated: `rss-db` (5432),
 | `INFRAREPLAY_ROLE` | `all` | Docker only: `api` · `shop` · `dashboard` · `all` |
 | `INFRAREPLAY_SEED` | `1` | Docker only: `0` skips boot seeding |
 | `INFRAREPLAY_API_PORT` | `8000` | Docker entrypoint only |
+| `INFRAREPLAY_API_KEYS` | — | v8 server: `label:secret,…`; empty = API open |
+| `INFRAREPLAY_API_KEY` | — | v8 client: key sent by CLI, dashboard, TUI, agent, seeder |
+| `INFRAREPLAY_STORAGE_PLUGIN` | `storage_fs` | v8: `storage_encrypted` for at-rest encryption |
+| `INFRAREPLAY_ENCRYPTION_KEY` | — | v8: Fernet key, from `infractl security keygen` |
+| `INFRAREPLAY_LOG_FORMAT` | `json` | v9: `console` for humans |
+| `INFRAREPLAY_LOG_LEVEL` | `INFO` | v9 |
 
 Production-target refusal matches `prod`, `production`, `live` in the target
 string (`PROD_TARGET_MARKERS`).

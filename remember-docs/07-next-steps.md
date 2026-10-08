@@ -4,20 +4,12 @@
 
 `idea.md` §8 says work strictly in version order and do not begin v(N+1)
 until v(N)'s DoD passes. The user's standing instruction (also in memory) is
-that v8–v12 are **not** to be started unprompted. v1–v7 is the agreed scope.
+that the remaining versions are **not** to be started unprompted. v1–v9 is
+the agreed scope (v8 and v9 were explicitly requested on 2026-10-08).
 
-## The remaining five versions
+## The remaining three versions
 
-**v8 — Security hardening.** Encryption at rest for stored blobs (age or
-Fernet), API access control (API keys minimum), an audit log of every
-capture/replay action, and tests asserting secrets never appear in stored
-recordings or API responses. Today recordings are redacted but not
-encrypted, and the API has no auth at all.
-
-**v9 — Observability.** `prometheus-client` metrics (`recordings_total`,
-`events_captured_total`, `capture_errors_total`, `replay_total`,
-`replay_failures_total`, `storage_bytes`), structlog JSON logs, a scrapeable
-`/metrics`, and a Grafana-importable dashboard JSON in `docs/`.
+**v8 and v9 are done** — see `docs/v8.md`, `docs/v9.md`.
 
 **v10 — Benchmark suite.** Locust against the demo shop with and without
 capture: req/s, P50/P95/P99, CPU, memory, captured bytes/sec at light /
@@ -47,6 +39,9 @@ with zero core changes: `pip install infrareplay-kafka-capture` then
   stream into the page; you stop it and reload.
 - **`docker/entrypoint.sh` runs as root** and the all-in-one container holds
   three services. Fine for a demo, wrong for anything else.
+- **Verify the observability profile live** once Docker is on (see `03`).
+- **The TUI has no live stream of a capture in progress** — the timeline
+  is loaded once; stop the capture to see it.
 - **No CI.** Everything was verified by hand plus `pytest`. A GitHub Actions
   workflow running `pytest` would be cheap and would have caught the stale
   egg-info problem.

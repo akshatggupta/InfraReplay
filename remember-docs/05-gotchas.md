@@ -136,3 +136,49 @@ configured but **timed out connecting** (`CONNECT_TIMEOUT`, 30s) as of
 `their_catalogue.json` (a travel-listings JSON) appeared in the repo root on
 2026-09-23. It is not part of InfraReplay, is untracked, and was left alone.
 Do not commit it.
+
+## 16. The Prometheus registry is process-wide
+
+Counters accumulate across every test in a run. A test asserting an absolute
+(`recordings == 2`) passes alone and fails in the suite (it saw 32). Assert
+**deltas** — before/after the work — as `test_observability.py` and
+`test_tui.py` do.
+
+## 17. A labelled metric does not exist until it is incremented
+
+`replay_failures_total{reason="refused"}` is absent from `/metrics` until the
+first refusal, so dashboards show *no data* instead of 0.
+`observability/metrics.py` creates every known label combination at zero on
+import. Add new label values there too.
+
+## 18. Textual: exclusive workers on a timer cancel themselves
+
+`@work(exclusive=True)` restarted every 2s cancels the previous run. Against an
+API slower than the tick, the poll never completes and the TUI never reports
+the outage. The app skips a tick while a poll is in flight (`_tick`).
+
+## 19. Textual: focus after switching tabs, and shutdown order
+
+- After switching tabs, focus stays on the tab bar, so `enter` does nothing.
+  `_FOCUS` maps each tab to the widget to focus.
+- Workers can outlive the HTTP client on quit → crash. `on_unmount` cancels
+  workers before closing the client, and a closed `Api` raises `ApiError`.
+
+## 20. WSL drops connections to dead localhost ports
+
+A connect to a port nothing listens on hangs (~3.8s here) instead of being
+refused. The TUI client uses a 3s connect timeout so "API down" shows within
+seconds, not after the 30s request timeout.
+
+## 21. Seeing the TUI without a terminal
+
+There is no browser or screen here, but Textual can export SVG
+(`app.save_screenshot()` inside `run_test`) and `cairosvg` (installed in the
+venv) rasterises it to PNG, which the Read tool can show. Box-drawing glyphs
+(the big `Digits`) and `█` bars render slightly off in cairosvg's font — a
+renderer artefact, not a TUI bug.
+
+## 22. Docker Desktop's WSL integration keeps turning off
+
+It was on on 2026-09-23 and off again on 2026-10-08 (`docker` not found).
+Check `docker version` before planning anything that needs it.

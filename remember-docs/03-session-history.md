@@ -82,3 +82,31 @@ itself.
   image was already gone when `docker rmi` ran — reported honestly rather
   than claimed as a success.)
 - Memory updated: scope note now says v1–v7 shipped, v8+ not started.
+
+## Same day, later: v8, v9 and the TUI (2026-10-08)
+
+Asked for "the next 2 versions", then mid-build for "a cool TUI over all
+these". v8 → v9 → TUI, in that order, so the TUI could cover everything.
+
+| Commit | What and why |
+|---|---|
+| `dde9b8c` | **FEAT: Mask secrets by shape, not only by key name.** Found while writing the v8 tests: a secret in a SQL parameter list or free text slipped past key-name redaction. Bearer tokens, JWTs, `sk_live_…`-style keys now masked anywhere. |
+| `74832f5` | **FEAT: Add API keys, an audit log and encryption at rest.** v8. `storage_encrypted`, `infrareplay/security/`, migration `0003_audit_log`, auth middleware, `infractl audit list`, `infractl security keygen`; CLI, dashboard, agent and Docker seeder all send `INFRAREPLAY_API_KEY`. |
+| `ae0db27` | **TEST** — v8 DoD on a live stack. Mutation-checked: switching key redaction off or writing blobs unencrypted makes it fail. |
+| `0f7de1e` | **DOCS** — `docs/v8.md`. |
+| `a26a296` | **FEAT: Export Prometheus metrics and JSON logs.** v9. Every label combination zero-initialised (found by a test: a labelled series otherwise reads *no data* until its first increment). |
+| `d207749` | **FEAT** — Grafana dashboard (14 panels) + `docker compose --profile observability`. |
+| `52d203a` | **TEST** — `/metrics` parses, counters move, dashboard queries only exported metrics (mutation-checked), logs are JSON with no secrets. |
+| `e380ab5` | **DOCS** — `docs/v9.md`. |
+| `f609e58` | **FEAT: Add a terminal UI over the whole API.** Built against real rendered screenshots (cairosvg on Textual's SVG export), which found four bugs — see `05-gotchas.md` §16–19. |
+| `07b5232` | **TEST** — 6 headless Pilot tests against a live API. |
+| `7bd18c0` | **DOCS** — `docs/tui.md`, README to v9, roadmap. |
+
+Tests: **57 passed, 1 skipped** (58 total).
+
+**Not yet verified live:** the `observability` Compose profile (Prometheus
+scraping, Grafana provisioning). Docker Desktop's WSL integration was off
+again when it was built. The dashboard JSON is validated by a test against
+`/metrics`, and the Compose file parses with every mount present — but
+nobody has watched Grafana load it yet. First thing to do once Docker is on:
+`docker compose --profile observability up --build`, then open :3001.

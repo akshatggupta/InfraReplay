@@ -2,7 +2,7 @@
 
 Handoff notes for picking InfraReplay up in a **new Claude Code session**
 (or on another machine). Written 2026-10-08, covering the session that ran
-2026-09-21 → 2026-10-08.
+2026-09-21 → 2026-10-08, and updated the same day after v8, v9 and the TUI.
 
 Read them in this order; each is standalone.
 
@@ -23,13 +23,14 @@ InfraReplay records a real HTTP + PostgreSQL workflow, replays it somewhere
 else, and diffs the two runs — so reproducing an incident stops being a
 guessing game. Core loop: **capture → correlate → store → replay → compare**.
 
-The build spec (`idea.md`) breaks it into twelve versions. **v1–v7 are
-done** (~58%, the whole pipeline running on real traffic, with a real
-concurrency bug caught end to end). v8–v12 are hardening and have not been
+The build spec (`idea.md`) breaks it into twelve versions. **v1–v9 are
+done** (75%): the whole pipeline on real traffic with a real concurrency
+bug caught end to end, plus security hardening (v8) and observability (v9).
+There is also a terminal UI, `infractl tui`. v10–v12 have not been
 started — and should not be started without being asked.
 
-Everything is committed and pushed to `main`
-(`git@github.com:akshatggupta/InfraReplay.git`, at `ee7a10c`).
+Everything is committed on `main`. Pushed through `01fc4ec`; the v8, v9
+and TUI commits (through `7bd18c0`) were **not pushed** as of 2026-10-08.
 
 ## If you are a fresh Claude session
 
