@@ -5,9 +5,11 @@ business logic lives in `recording`, `replay`, and `comparison`.
 """
 
 from contextlib import asynccontextmanager
+from time import perf_counter
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from infrareplay import config, demo
@@ -19,6 +21,13 @@ from infrareplay.capture import (
     stop_session,
 )
 from infrareplay.db import init_db
+from infrareplay.observability import (
+    bind_request,
+    clear_request,
+    configure,
+    get_logger,
+    metrics,
+)
 from infrareplay.plugins.registry import PluginError, get_registry
 from infrareplay.recording import (
     BundleError,
@@ -55,6 +64,11 @@ _PUBLIC_PATHS = frozenset(
 )
 
 _UNKNOWN_CALLER = "unknown"
+
+_REQUEST_ID_HEADER = "x-request-id"
+_UNMATCHED_ROUTE = "unmatched"
+
+_log = get_logger(__name__)
 
 
 def _actor(request: Request) -> str:
@@ -100,8 +114,19 @@ class ReplayResponse(BaseModel):
 
 @asynccontextmanager
 async def _lifespan(_: FastAPI):
+    configure()
     await init_db()
     get_registry()
+
+    _log.info(
+        "api.started",
+        auth="api-keys" if auth_enabled() else "open",
+        storage=config.STORAGE_PLUGIN,
+    )
+
+    if not auth_enabled():
+        _log.warning("api.auth_open", hint="set INFRAREPLAY_API_KEYS to require keys")
+
     yield
 
 
@@ -122,6 +147,9 @@ def create_app() -> FastAPI:
         actor = resolve_actor(request.headers.get(API_KEY_HEADER))
 
         if actor is None:
+            metrics.AUTH_DENIED.inc()
+            _log.warning("auth.denied", method=request.method, path=request.url.path)
+
             await record(
                 AuditAction.AUTH_DENIED,
                 actor=_UNKNOWN_CALLER,
@@ -135,6 +163,46 @@ def create_app() -> FastAPI:
 
         request.state.actor = actor
         return await call_next(request)
+
+    @app.middleware("http")
+    async def observe(request: Request, call_next):
+        """Request id, latency histogram, one log line per request.
+
+        Registered after `authenticate`, so it wraps it: refused calls are
+        timed and logged too, under the same request id.
+        """
+
+        request_id = request.headers.get(_REQUEST_ID_HEADER) or uuid4().hex[:16]
+
+        clear_request()
+        bind_request(request_id=request_id)
+
+        started = perf_counter()
+        response = await call_next(request)
+        seconds = perf_counter() - started
+
+        # The route *template*, never the raw path: ids would explode the series.
+        route = getattr(request.scope.get("route"), "path", _UNMATCHED_ROUTE)
+
+        metrics.HTTP_SECONDS.labels(request.method, route, str(response.status_code)).observe(seconds)
+        response.headers[_REQUEST_ID_HEADER] = request_id
+
+        _log.info(
+            "http.request",
+            method=request.method,
+            route=route,
+            status=response.status_code,
+            ms=round(seconds * 1000, 2),
+            actor=getattr(request.state, "actor", None),
+        )
+
+        return response
+
+    @app.get("/metrics", include_in_schema=False)
+    async def prometheus() -> Response:
+        body, content_type = metrics.render()
+
+        return Response(content=body, media_type=content_type)
 
     @app.get("/health")
     async def health() -> dict:

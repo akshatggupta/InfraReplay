@@ -7,7 +7,10 @@ instrumented target can stream its own SQL events into the run while it is
 still in flight (see `infrareplay.agent`).
 """
 
+from time import perf_counter
+
 from infrareplay.comparison import compare_run
+from infrareplay.observability import get_logger, metrics
 from infrareplay.recording import (
     append_events,
     fail_recording,
@@ -28,6 +31,8 @@ from infrareplay.replay.linking import link_streams
 from infrareplay.replay.substitution import AutoMode
 from infrareplay.schema import ComparisonCategory, RecordingKind, ReplayRun
 
+_log = get_logger(__name__)
+
 
 async def run_replay(
     *,
@@ -40,12 +45,23 @@ async def run_replay(
 ) -> tuple[ReplayRun, dict[str, int]]:
     """Returns the ReplayRun plus a per-category count of the comparison."""
 
-    ensure_safe(target, safety)
+    kind = metrics.target_kind(target)
+
+    try:
+        ensure_safe(target, safety)
+    except ReplayError:
+        metrics.REPLAY_FAILURES.labels(metrics.ReplayFailure.REFUSED.value).inc()
+        _log.warning("replay.refused", recording_id=recording_id, target_kind=kind)
+        raise
 
     source = await get_recording(recording_id)
 
     if source is None:
+        metrics.REPLAY_FAILURES.labels(metrics.ReplayFailure.NOT_FOUND.value).inc()
         raise ReplayError(f"recording {recording_id!r} not found")
+
+    metrics.REPLAYS.labels(kind).inc()
+    started = perf_counter()
 
     replay_id = new_id("rpl")
 
@@ -69,6 +85,7 @@ async def run_replay(
             concurrency=concurrency,
         )
     except ReplayError as exc:
+        metrics.REPLAY_FAILURES.labels(metrics.ReplayFailure.ERROR.value).inc()
         await fail_recording(replay_id, str(exc))
         raise
 
@@ -87,6 +104,20 @@ async def run_replay(
 
     for result in results:
         summary[result.category.value] += 1
+        metrics.COMPARISON_RESULTS.labels(result.category.value).inc()
+
+    seconds = perf_counter() - started
+    metrics.REPLAY_SECONDS.labels(kind).observe(seconds)
+
+    _log.info(
+        "replay.finished",
+        recording_id=recording_id,
+        replay_recording_id=replay_id,
+        target_kind=kind,
+        concurrency=concurrency,
+        seconds=round(seconds, 4),
+        **{c.lower(): n for c, n in summary.items()},
+    )
 
     run = ReplayRun(
         replay_recording_id=replay_id,

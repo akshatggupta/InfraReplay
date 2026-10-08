@@ -65,3 +65,8 @@ API_KEYS = _parse_api_keys(os.environ.get("INFRAREPLAY_API_KEYS", ""))
 
 # Client side: the key the CLI and dashboard send.
 API_KEY = os.environ.get("INFRAREPLAY_API_KEY", "")
+
+
+# ----------------------------------------------------------- observability
+LOG_FORMAT = os.environ.get("INFRAREPLAY_LOG_FORMAT", "json")
+LOG_LEVEL = os.environ.get("INFRAREPLAY_LOG_LEVEL", "INFO").upper()

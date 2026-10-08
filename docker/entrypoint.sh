@@ -24,8 +24,10 @@ API_PORT="${INFRAREPLAY_API_PORT:-8000}"
 SHOP_PORT="${DEMO_SHOP_PORT:-3000}"
 DASHBOARD_PORT="${INFRAREPLAY_DASHBOARD_PORT:-8080}"
 
+# The API logs every request itself, as JSON; uvicorn's access log would
+# only interleave plain-text duplicates.
 start_api() {
-  uvicorn infrareplay.api.app:app --host 0.0.0.0 --port "$API_PORT" &
+  uvicorn infrareplay.api.app:app --host 0.0.0.0 --port "$API_PORT" --no-access-log &
 }
 
 start_shop() {
@@ -37,7 +39,7 @@ start_dashboard() {
 }
 
 case "$ROLE" in
-  api)       exec uvicorn infrareplay.api.app:app --host 0.0.0.0 --port "$API_PORT" ;;
+  api)       exec uvicorn infrareplay.api.app:app --host 0.0.0.0 --port "$API_PORT" --no-access-log ;;
   shop)      exec uvicorn examples.demo_shop.app:app --host 0.0.0.0 --port "$SHOP_PORT" ;;
   dashboard) exec python -m infrareplay.dashboard.app ;;
   all)       ;;

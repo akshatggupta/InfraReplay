@@ -15,6 +15,7 @@ door for those, and the reason a recording row exists before any event does.
 import asyncio
 
 from infrareplay.contracts import CapturePlugin
+from infrareplay.observability import get_logger, metrics
 from infrareplay.plugins.registry import get_registry
 from infrareplay.recording import (
     append_events,
@@ -26,6 +27,8 @@ from infrareplay.recording import (
 from infrareplay.schema import Event, Recording, RecordingStatus
 
 _UPSTREAM = "upstream"
+
+_log = get_logger(__name__)
 
 
 class CaptureError(RuntimeError):
@@ -111,6 +114,15 @@ async def start_session(
     await session.open(config)
     _SESSIONS[recording_id] = session
 
+    metrics.ACTIVE_CAPTURES.inc()
+    _log.info(
+        "capture.started",
+        recording_id=recording_id,
+        plugin=plugin_name,
+        upstream=session.target,
+        listen_port=session.describe()["listen_port"],
+    )
+
     return session
 
 
@@ -120,7 +132,12 @@ async def stop_session(recording_id: str) -> Recording:
     if session is None:
         raise CaptureError(f"no live capture session {recording_id!r}")
 
-    return await session.close()
+    metrics.ACTIVE_CAPTURES.dec()
+    recording = await session.close()
+
+    _log.info("capture.stopped", recording_id=recording_id, events=len(recording.events))
+
+    return recording
 
 
 def active_sessions() -> list[dict]:

@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from infrareplay import config
 
 from infrareplay.db import ComparisonRow, EventRow, RecordingRow, get_session, init_db
+from infrareplay.observability import get_logger, metrics
 from infrareplay.plugins.registry import get_registry
 from infrareplay.recording.correlate import correlate
 from infrareplay.recording.portable import build_bundle, parse_bundle, rekey
@@ -24,6 +25,8 @@ from infrareplay.schema import (
 )
 
 _DEFAULT_REDACTION = "redaction_default"
+
+_log = get_logger(__name__)
 _SNAPSHOT_KEY = "recordings/{rid}/recording.json"
 
 
@@ -152,6 +155,9 @@ async def append_events(
 
         await session.commit()
 
+    for event in stored:
+        metrics.EVENTS_CAPTURED.labels(event.event_type.value).inc()
+
     return stored
 
 
@@ -165,6 +171,13 @@ async def fail_recording(recording_id: str, reason: str) -> None:
         row.status = RecordingStatus.FAILED.value
         row.title = f"{row.title} (failed: {reason})"
         await session.commit()
+
+        metrics.RECORDINGS.labels(row.kind, RecordingStatus.FAILED.value).inc()
+
+        if row.kind == RecordingKind.CAPTURE.value:
+            metrics.CAPTURE_ERRORS.inc()
+
+        _log.warning("recording.failed", recording_id=recording_id, kind=row.kind, reason=reason)
 
 
 async def finish_recording(recording_id: str) -> Recording:
@@ -186,13 +199,17 @@ async def finish_recording(recording_id: str) -> Recording:
             stored.sequence = event.sequence
             stored.parent_event_id = event.parent_event_id
 
+        snapshot = _snapshot_bytes(row, events)
+
         row.blob_locator = await storage.put_blob(
-            _SNAPSHOT_KEY.format(rid=recording_id),
-            _snapshot_bytes(row, events),
+            _SNAPSHOT_KEY.format(rid=recording_id), snapshot
         )
         row.status = RecordingStatus.COMPLETED.value
 
         await session.commit()
+
+        metrics.RECORDINGS.labels(row.kind, RecordingStatus.COMPLETED.value).inc()
+        metrics.STORAGE_BYTES.inc(len(snapshot))
 
         return _row_to_recording(row, events)
 
