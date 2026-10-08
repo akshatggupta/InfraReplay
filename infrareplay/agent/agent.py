@@ -7,6 +7,7 @@ from infrareplay.capture import context
 from infrareplay.plugins.registry import get_registry
 from infrareplay.replay.http_target import CORRELATION_HEADER, RECORDING_HEADER
 from infrareplay.schema import Event
+from infrareplay.security import API_KEY_HEADER
 
 _SQL_PLUGIN = "postgres_capture"
 _INGEST_PATH = "/api/captures/{rid}/events"
@@ -26,6 +27,7 @@ class CaptureAgent:
     ) -> None:
         self._engine = engine
         self._api_url = (api_url or config.API_URL).rstrip("/")
+        self._headers = {API_KEY_HEADER: config.API_KEY} if config.API_KEY else {}
         self._service = service
         self._plugin = get_registry().capture(plugin_name)()
         self._stream = None
@@ -57,7 +59,7 @@ class CaptureAgent:
 
         try:
             async with httpx.AsyncClient(
-                base_url=self._api_url, timeout=_TIMEOUT_S
+                base_url=self._api_url, timeout=_TIMEOUT_S, headers=self._headers
             ) as client:
                 for recording_id, batch in batches.items():
                     await client.post(

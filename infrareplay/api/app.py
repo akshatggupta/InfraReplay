@@ -6,10 +6,11 @@ business logic lives in `recording`, `replay`, and `comparison`.
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from infrareplay import demo
+from infrareplay import config, demo
 from infrareplay.capture import (
     CaptureError,
     active_sessions,
@@ -33,9 +34,31 @@ from infrareplay.replay.engine import ReplayError, SafetyMode
 from infrareplay.replay.runner import run_replay
 from infrareplay.replay.substitution import AutoMode
 from infrareplay.schema import ComparisonResult, Event, Recording, RecordingKind
+from infrareplay.security import (
+    ANONYMOUS,
+    API_KEY_HEADER,
+    AuditAction,
+    Outcome,
+    auth_enabled,
+    list_entries,
+    record,
+    resolve_actor,
+)
 
 _NOT_FOUND = 404
 _BAD_REQUEST = 400
+_UNAUTHORIZED = 401
+
+# Open without a key: liveness, scraping, and the API's own documentation.
+_PUBLIC_PATHS = frozenset(
+    {"/health", "/metrics", "/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"}
+)
+
+_UNKNOWN_CALLER = "unknown"
+
+
+def _actor(request: Request) -> str:
+    return getattr(request.state, "actor", ANONYMOUS)
 
 
 class CaptureRequest(BaseModel):
@@ -85,22 +108,65 @@ async def _lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title="InfraReplay", version="0.1.0", lifespan=_lifespan)
 
+    @app.middleware("http")
+    async def authenticate(request: Request, call_next):
+        """Every /api route needs a valid x-api-key once keys are configured.
+
+        A refusal is itself audited: a run of auth.denied rows is what a
+        probe looks like.
+        """
+
+        if request.url.path in _PUBLIC_PATHS:
+            return await call_next(request)
+
+        actor = resolve_actor(request.headers.get(API_KEY_HEADER))
+
+        if actor is None:
+            await record(
+                AuditAction.AUTH_DENIED,
+                actor=_UNKNOWN_CALLER,
+                outcome=Outcome.DENIED,
+                target=f"{request.method} {request.url.path}",
+            )
+            return JSONResponse(
+                {"detail": f"missing or invalid {API_KEY_HEADER}"},
+                status_code=_UNAUTHORIZED,
+            )
+
+        request.state.actor = actor
+        return await call_next(request)
+
     @app.get("/health")
     async def health() -> dict:
-        return {"status": "ok"}
+        # Says out loud when the API is open, so nobody assumes otherwise.
+        return {
+            "status": "ok",
+            "auth": "api-keys" if auth_enabled() else "open",
+            "storage": config.STORAGE_PLUGIN,
+        }
 
     @app.get("/api/plugins")
     async def plugins() -> list[dict]:
         return get_registry().describe()
 
     @app.post("/api/demo/seed", response_model=list[Recording])
-    async def seed() -> list[Recording]:
-        return await demo.seed()
+    async def seed(request: Request) -> list[Recording]:
+        seeded = await demo.seed()
+
+        await record(
+            AuditAction.DEMO_SEED,
+            actor=_actor(request),
+            detail={"recordings": [r.recording_id for r in seeded]},
+        )
+
+        return seeded
 
     # --------------------------------------------------------- live capture
 
     @app.post("/api/captures", response_model=CaptureResponse)
-    async def start_capture(req: CaptureRequest) -> CaptureResponse:
+    async def start_capture(req: CaptureRequest, request: Request) -> CaptureResponse:
+        upstream = req.config.get("upstream")
+
         try:
             session = await start_session(
                 plugin_name=req.plugin,
@@ -109,20 +175,53 @@ def create_app() -> FastAPI:
                 config=req.config,
             )
         except (CaptureError, PluginError) as exc:
+            await record(
+                AuditAction.CAPTURE_START,
+                actor=_actor(request),
+                outcome=Outcome.FAILED,
+                target=upstream,
+                detail={"plugin": req.plugin, "error": str(exc)},
+            )
             raise HTTPException(_BAD_REQUEST, str(exc))
 
-        return CaptureResponse(**session.describe())
+        described = session.describe()
+
+        await record(
+            AuditAction.CAPTURE_START,
+            actor=_actor(request),
+            recording_id=session.recording_id,
+            target=upstream,
+            detail={"plugin": req.plugin, "listen_port": described["listen_port"]},
+        )
+
+        return CaptureResponse(**described)
 
     @app.get("/api/captures", response_model=list[CaptureResponse])
     async def captures() -> list[CaptureResponse]:
         return [CaptureResponse(**s) for s in active_sessions()]
 
     @app.post("/api/captures/{recording_id}/stop", response_model=Recording)
-    async def stop_capture(recording_id: str) -> Recording:
+    async def stop_capture(recording_id: str, request: Request) -> Recording:
         try:
-            return await stop_session(recording_id)
+            stopped = await stop_session(recording_id)
         except CaptureError as exc:
+            await record(
+                AuditAction.CAPTURE_STOP,
+                actor=_actor(request),
+                outcome=Outcome.FAILED,
+                recording_id=recording_id,
+                detail={"error": str(exc)},
+            )
             raise HTTPException(_BAD_REQUEST, str(exc))
+
+        await record(
+            AuditAction.CAPTURE_STOP,
+            actor=_actor(request),
+            recording_id=recording_id,
+            detail={"events": len(stopped.events)},
+        )
+
+        return stopped
 
     @app.post("/api/captures/{recording_id}/events")
     async def ingest(recording_id: str, events: list[Event]) -> dict:
@@ -149,8 +248,15 @@ def create_app() -> FastAPI:
         return found
 
     @app.get("/api/recordings/{recording_id}/export")
-    async def export(recording_id: str) -> dict:
+    async def export(recording_id: str, request: Request) -> dict:
         bundle = await export_recording(recording_id)
+
+        await record(
+            AuditAction.RECORDING_EXPORT,
+            actor=_actor(request),
+            outcome=Outcome.OK if bundle else Outcome.FAILED,
+            recording_id=recording_id,
+        )
 
         if bundle is None:
             raise HTTPException(_NOT_FOUND, f"recording {recording_id} not found")
@@ -158,11 +264,26 @@ def create_app() -> FastAPI:
         return bundle
 
     @app.post("/api/recordings/import", response_model=Recording)
-    async def import_bundle(bundle: dict) -> Recording:
+    async def import_bundle(bundle: dict, request: Request) -> Recording:
         try:
-            return await import_recording(bundle)
+            imported = await import_recording(bundle)
         except BundleError as exc:
+            await record(
+                AuditAction.RECORDING_IMPORT,
+                actor=_actor(request),
+                outcome=Outcome.FAILED,
+                detail={"error": str(exc)},
+            )
             raise HTTPException(_BAD_REQUEST, str(exc))
+
+        await record(
+            AuditAction.RECORDING_IMPORT,
+            actor=_actor(request),
+            recording_id=imported.recording_id,
+            detail={"events": len(imported.events)},
+        )
+
+        return imported
 
     @app.post("/api/recordings/validate")
     async def validate_bundle(bundle: dict) -> dict:
@@ -184,6 +305,14 @@ def create_app() -> FastAPI:
     async def projects() -> list[dict]:
         return await list_projects()
 
+    @app.get("/api/audit")
+    async def audit(
+        limit: int = 100,
+        action: AuditAction | None = None,
+        recording_id: str | None = None,
+    ) -> list[dict]:
+        return await list_entries(limit=limit, action=action, recording_id=recording_id)
+
     # ----------------------------------------------------------------- replay
 
     @app.get("/api/replays", response_model=list[Recording])
@@ -191,9 +320,16 @@ def create_app() -> FastAPI:
         return await list_recordings(RecordingKind.REPLAY)
 
     @app.post("/api/replays", response_model=ReplayResponse)
-    async def create_replay(req: ReplayRequest) -> ReplayResponse:
+    async def create_replay(req: ReplayRequest, request: Request) -> ReplayResponse:
         safety = SafetyMode.UNSAFE if req.unsafe else SafetyMode.SAFE
         auto = AutoMode.FRESH_IDS if req.auto_substitute else AutoMode.OFF
+
+        # Substitution *keys* only: the values may be fresh credentials.
+        detail = {
+            "unsafe": req.unsafe,
+            "concurrency": req.concurrency,
+            "substituted": sorted(req.substitutions or {}),
+        }
 
         try:
             run, summary = await run_replay(
@@ -205,7 +341,23 @@ def create_app() -> FastAPI:
                 concurrency=req.concurrency,
             )
         except ReplayError as exc:
+            await record(
+                AuditAction.REPLAY_RUN,
+                actor=_actor(request),
+                outcome=Outcome.FAILED,
+                recording_id=req.recording_id,
+                target=req.target,
+                detail={**detail, "error": str(exc)},
+            )
             raise HTTPException(_BAD_REQUEST, str(exc))
+
+        await record(
+            AuditAction.REPLAY_RUN,
+            actor=_actor(request),
+            recording_id=req.recording_id,
+            target=req.target,
+            detail={**detail, "replay_recording_id": run.replay_recording_id, "summary": summary},
+        )
 
         return ReplayResponse(
             replay_recording_id=run.replay_recording_id,

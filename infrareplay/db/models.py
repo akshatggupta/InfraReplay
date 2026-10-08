@@ -74,3 +74,26 @@ class ComparisonRow(Base):
     event_type: Mapped[str] = mapped_column(String(32))
     category: Mapped[str] = mapped_column(String(16))
     diff: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class AuditRow(Base):
+    """Append-only record of who did what to which recording.
+
+    No foreign key on recording_id: the log must also hold attempts against
+    recordings that do not exist, and must outlive anything it refers to.
+    """
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, index=True
+    )
+
+    action: Mapped[str] = mapped_column(String(32), index=True)
+    actor: Mapped[str] = mapped_column(String(64))
+    outcome: Mapped[str] = mapped_column(String(16))
+
+    recording_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    target: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)

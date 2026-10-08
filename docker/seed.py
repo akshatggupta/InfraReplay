@@ -12,6 +12,7 @@ import httpx
 
 API_URL = os.environ.get("INFRAREPLAY_API_URL", "http://127.0.0.1:8000")
 SEED = os.environ.get("INFRAREPLAY_SEED", "1") != "0"
+HEADERS = {"x-api-key": os.environ["INFRAREPLAY_API_KEY"]} if os.environ.get("INFRAREPLAY_API_KEY") else {}
 
 _TIMEOUT_S = 60
 _POLL_S = 0.5
@@ -39,13 +40,13 @@ def main() -> int:
         return 0
 
     try:
-        existing = httpx.get(f"{API_URL}/api/recordings", timeout=10).json()
+        existing = httpx.get(f"{API_URL}/api/recordings", timeout=10, headers=HEADERS).json()
 
         if existing:
             print(f"{len(existing)} recordings already stored; not seeding")
             return 0
 
-        seeded = httpx.post(f"{API_URL}/api/demo/seed", timeout=30).json()
+        seeded = httpx.post(f"{API_URL}/api/demo/seed", timeout=30, headers=HEADERS).json()
 
         for recording in seeded:
             print(f"seeded {recording['recording_id']}  {recording['title']}")

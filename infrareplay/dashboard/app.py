@@ -18,6 +18,13 @@ from nicegui import ui
 _API = os.environ.get("INFRAREPLAY_API_URL", "http://127.0.0.1:8000")
 _TIMEOUT_S = 30
 
+# Sent on every call once the API has keys configured (v8).
+_HEADERS = (
+    {"x-api-key": os.environ["INFRAREPLAY_API_KEY"]}
+    if os.environ.get("INFRAREPLAY_API_KEY")
+    else {}
+)
+
 _CATEGORY_COLOR = {
     "MATCH": "#34d399",
     "DIFFERENT": "#fbbf24",
@@ -66,14 +73,14 @@ ui.add_head_html(_CSS, shared=True)
 
 
 async def _get(path: str, **params):
-    async with httpx.AsyncClient(base_url=_API, timeout=_TIMEOUT_S) as c:
+    async with httpx.AsyncClient(base_url=_API, timeout=_TIMEOUT_S, headers=_HEADERS) as c:
         resp = await c.get(path, params=params)
         resp.raise_for_status()
         return resp.json()
 
 
 async def _post(path: str, payload: dict | None = None):
-    async with httpx.AsyncClient(base_url=_API, timeout=_TIMEOUT_S) as c:
+    async with httpx.AsyncClient(base_url=_API, timeout=_TIMEOUT_S, headers=_HEADERS) as c:
         resp = await c.post(path, json=payload)
         resp.raise_for_status()
         return resp.json()

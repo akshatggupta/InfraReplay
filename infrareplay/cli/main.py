@@ -7,6 +7,7 @@ import httpx
 import typer
 
 from infrareplay import config
+from infrareplay.security import API_KEY_HEADER, generate_key
 
 app = typer.Typer(help="InfraReplay control CLI", no_args_is_help=True)
 demo_app = typer.Typer(help="Demo/seed helpers")
@@ -14,19 +15,25 @@ recordings_app = typer.Typer(help="Inspect recordings")
 plugins_app = typer.Typer(help="Plugin registry")
 capture_app = typer.Typer(help="Live capture sessions")
 projects_app = typer.Typer(help="Projects")
+audit_app = typer.Typer(help="Audit log of capture, replay and bundle actions")
+security_app = typer.Typer(help="Keys for encryption at rest")
 
 app.add_typer(demo_app, name="demo")
 app.add_typer(recordings_app, name="recordings")
 app.add_typer(plugins_app, name="plugins")
 app.add_typer(capture_app, name="capture")
 app.add_typer(projects_app, name="projects")
+app.add_typer(audit_app, name="audit")
+app.add_typer(security_app, name="security")
 
 _TIMEOUT_S = 30
 _LOCALHOST = "http://127.0.0.1"
 
 
 def _client() -> httpx.Client:
-    return httpx.Client(base_url=config.API_URL, timeout=_TIMEOUT_S)
+    headers = {API_KEY_HEADER: config.API_KEY} if config.API_KEY else {}
+
+    return httpx.Client(base_url=config.API_URL, timeout=_TIMEOUT_S, headers=headers)
 
 
 def _echo_json(data) -> None:
@@ -159,6 +166,46 @@ def projects_list() -> None:
 
     for row in resp.json():
         typer.echo(f"{row['project']:<20} {row['recordings']:>3} recordings  {row['last_activity']}")
+
+
+# ------------------------------------------------------------------- audit
+
+
+@audit_app.command("list")
+def audit_list(
+    action: str = typer.Option(None, help="e.g. replay.run, capture.start, auth.denied"),
+    recording: str = typer.Option(None, help="only entries for this recording id"),
+    limit: int = typer.Option(50, help="newest first"),
+) -> None:
+    params = {"limit": limit}
+
+    if action:
+        params["action"] = action
+
+    if recording:
+        params["recording_id"] = recording
+
+    with _client() as c:
+        resp = c.get("/api/audit", params=params)
+
+    if resp.is_error:
+        _fail(resp)
+
+    for e in resp.json():
+        typer.echo(
+            f"{e['created_at'][:19]}  {e['outcome']:<6} {e['action']:<17} "
+            f"{e['actor']:<12} {e['recording_id'] or '-':<17} {e['target'] or ''}"
+        )
+
+
+# ---------------------------------------------------------------- security
+
+
+@security_app.command("keygen")
+def security_keygen() -> None:
+    """Print a fresh key for INFRAREPLAY_ENCRYPTION_KEY. Local; calls no API."""
+
+    typer.echo(generate_key())
 
 
 # ----------------------------------------------------------------- capture

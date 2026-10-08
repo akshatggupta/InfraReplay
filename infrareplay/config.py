@@ -29,3 +29,39 @@ CAPTURE_TIMEOUT_S = float(os.environ.get("INFRAREPLAY_CAPTURE_TIMEOUT_S", 30))
 IGNORE_FIELDS = frozenset(
     f.strip() for f in os.environ.get("INFRAREPLAY_IGNORE_FIELDS", "").split(",") if f.strip()
 )
+
+
+# ---------------------------------------------------------------- security
+#
+# Blob storage is chosen by registry name. `storage_encrypted` wraps
+# `storage_fs` with Fernet and needs INFRAREPLAY_ENCRYPTION_KEY; generate one
+# with `infractl security keygen`.
+STORAGE_PLUGIN = os.environ.get("INFRAREPLAY_STORAGE_PLUGIN", "storage_fs")
+ENCRYPTION_KEY = os.environ.get("INFRAREPLAY_ENCRYPTION_KEY", "")
+
+
+def _parse_api_keys(raw: str) -> dict[str, str]:
+    """"ci:s3cret,dana:t0ken" -> {"s3cret": "ci", "t0ken": "dana"}.
+
+    The label is what the audit log records as the actor; a bare secret with
+    no label is recorded as "api-key".
+    """
+
+    keys: dict[str, str] = {}
+
+    for entry in (e.strip() for e in raw.split(",")):
+        if not entry:
+            continue
+
+        label, _, secret = entry.rpartition(":")
+        keys[secret] = label or "api-key"
+
+    return keys
+
+
+# Server side: accepted keys. Empty means the API is open — the dev default,
+# announced on /health and in the startup log rather than silently assumed.
+API_KEYS = _parse_api_keys(os.environ.get("INFRAREPLAY_API_KEYS", ""))
+
+# Client side: the key the CLI and dashboard send.
+API_KEY = os.environ.get("INFRAREPLAY_API_KEY", "")

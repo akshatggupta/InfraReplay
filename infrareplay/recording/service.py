@@ -9,6 +9,8 @@ from uuid import uuid4
 
 from sqlalchemy import func, select
 
+from infrareplay import config
+
 from infrareplay.db import ComparisonRow, EventRow, RecordingRow, get_session, init_db
 from infrareplay.plugins.registry import get_registry
 from infrareplay.recording.correlate import correlate
@@ -22,7 +24,6 @@ from infrareplay.schema import (
 )
 
 _DEFAULT_REDACTION = "redaction_default"
-_DEFAULT_STORAGE = "storage_fs"
 _SNAPSHOT_KEY = "recordings/{rid}/recording.json"
 
 
@@ -169,7 +170,8 @@ async def fail_recording(recording_id: str, reason: str) -> None:
 async def finish_recording(recording_id: str) -> Recording:
     """Correlate what was collected, snapshot it to blob storage, complete."""
 
-    storage = get_registry().storage(_DEFAULT_STORAGE)()
+    # By name from config: storage_fs, or storage_encrypted for at-rest encryption.
+    storage = get_registry().storage(config.STORAGE_PLUGIN)()
 
     async with get_session() as session:
         row = await session.get(RecordingRow, recording_id)
