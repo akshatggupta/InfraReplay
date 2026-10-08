@@ -5,7 +5,7 @@ recording, replay it elsewhere, and get an automatic diff.
 
 **Core loop:** capture → correlate → store → replay → compare.
 
-## Status: v7 of 12 — real capture, real replay, real bug caught
+## Status: v9 of 12 — real capture, real replay, secured and observable
 
 The pipeline runs on **real traffic**, end to end:
 
@@ -16,7 +16,14 @@ The pipeline runs on **real traffic**, end to end:
   concurrently) and records what really comes back — including the SQL the
   target ran;
 - the comparison normalises away fresh ids and clocks, so what it reports
-  is a real difference.
+  is a real difference;
+- secrets are masked before anything is stored, blob snapshots can be
+  encrypted at rest, the API can require keys, and every capture and replay
+  is audited (v8);
+- Prometheus metrics, JSON logs and a ready-made Grafana dashboard show what
+  it is doing (v9).
+
+And there is a **terminal UI** over all of it: `infractl tui`.
 
 `MockCapturePlugin` is still there and still used by `infractl demo seed`,
 the unit tests and CI — it is how the whole thing was proved before any
@@ -38,6 +45,17 @@ uvicorn examples.demo_shop.app:app --port 3000
 # terminal 3 — dashboard
 python -m infrareplay.dashboard.app        # http://127.0.0.1:8080
 ```
+
+## Terminal UI
+
+```bash
+infractl tui
+```
+
+Live metric tiles and sparklines, recordings with their request waterfall,
+replay from a dialog, comparisons that name the exact field that changed,
+live capture start/stop, and the audit log — all keyboard-driven. Keys and
+screens: `docs/tui.md`.
 
 ## Quick start (Docker — one command)
 
@@ -99,6 +117,32 @@ DEMO_SHOP_LOCK_INVENTORY=1 docker compose up -d --force-recreate shop
 Postgres is deliberately not published to the host — it would collide
 with any Postgres already running there. Tear the stack down with
 `docker compose down -v`.
+
+## Observability (v9)
+
+```bash
+docker compose --profile observability up --build
+```
+
+Adds Prometheus (http://localhost:9090) scraping `/metrics` every 5s and
+Grafana (http://localhost:3001) opening straight onto the InfraReplay
+dashboard. The dashboard file, `docs/grafana/infrareplay-dashboard.json`,
+also imports by hand into any Grafana. Logs are one JSON object per line;
+`INFRAREPLAY_LOG_FORMAT=console` for humans.
+
+## Security (v8)
+
+```bash
+export INFRAREPLAY_API_KEYS="ci:$(openssl rand -hex 16)"   # server: require keys
+export INFRAREPLAY_API_KEY="<that secret>"                  # clients: send one
+
+export INFRAREPLAY_STORAGE_PLUGIN=storage_encrypted          # encrypt blobs at rest
+export INFRAREPLAY_ENCRYPTION_KEY="$(infractl security keygen)"
+```
+
+With no keys set the API is open — the dev default — and `/health` says so.
+`infractl audit list` shows who captured, replayed, exported or imported
+what, and every refused call. Details and limits: `docs/v8.md`.
 
 ## Demo transcript
 
@@ -182,6 +226,9 @@ and stops a live proxy from the browser.
 | `infractl compare <replay-id>` | show a replay's comparison |
 | `infractl projects list` | recordings per project |
 | `infractl plugins list` | registered plugins |
+| `infractl tui` | the terminal UI |
+| `infractl audit list [--action replay.run] [--recording <id>]` | the audit log |
+| `infractl security keygen` | a fresh key for encryption at rest |
 
 ## Tests
 
@@ -189,9 +236,10 @@ and stops a live proxy from the browser.
 pytest
 ```
 
-35 tests. The integration suite starts a real API, a real demo shop and a
-real capture proxy on real ports — nothing about capture, replay or
-comparison is stubbed there.
+58 tests (one skips unless a stack is running). The integration suite
+starts a real API, a real demo shop and a real capture proxy on real ports —
+nothing about capture, replay or comparison is stubbed there — and drives
+the TUI headlessly against a live API.
 
 ## Layout
 
@@ -200,10 +248,12 @@ infrareplay/
   schema/       Pydantic Event / Recording / ReplayRun / ComparisonResult
   contracts/    ABCs: capture, storage, redaction, comparator
   plugins/      registry + built-ins (mock_capture, http_capture,
-                postgres_capture, storage_fs, redaction_default,
-                http/postgres comparators)
+                postgres_capture, storage_fs, storage_encrypted,
+                redaction_default, http/postgres comparators)
   capture/      live sessions, correlation context, ingest
   agent/        app-side instrumentation (middleware + ingest client)
+  security/     API keys, audit log, encryption keys
+  observability/ Prometheus metrics, structlog JSON logs
   db/           async SQLAlchemy metadata store
   recording/    lifecycle, correlation, export/import
   replay/       engine, live HTTP target, substitution, linking
@@ -211,9 +261,12 @@ infrareplay/
   api/          FastAPI
   cli/          Typer (infractl)
   dashboard/    NiceGUI
+  tui/          Textual (infractl tui)
 examples/demo_shop/   the recorded application, with its bug
+docs/grafana/         dashboard + Prometheus/Grafana provisioning
 migrations/           Alembic
 ```
 
 See `architecture.md` for the system design, `docs/roadmap.md` for build
-state, and `docs/v1.md` … `docs/v7.md` for what each version added.
+state, `docs/v1.md` … `docs/v9.md` for what each version added, and
+`docs/tui.md` for the terminal UI.
