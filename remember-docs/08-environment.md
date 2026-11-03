@@ -4,7 +4,7 @@
 
 | Thing | Value |
 |---|---|
-| Project root | `/mnt/d/InfraReplay` |
+| Project root | `/mnt/e/InfraReplay` (moved from `/mnt/d` before 2026-11-02; see gotcha §23) |
 | Platform | WSL2 on Windows (`Linux 5.15.167.4-microsoft-standard-WSL2`) |
 | Python | 3.12.3, venv at `.venv/` (has `setuptools`, needed for `--no-build-isolation`) |
 | Git remote | `git@github.com:akshatggupta/InfraReplay.git` |
@@ -21,6 +21,7 @@ Local state files (all gitignored): `infrareplay.db`, `demo_shop.db`,
 | 8000 | API | `/docs` for OpenAPI |
 | 8080 | NiceGUI dashboard | the frontend |
 | 3000 | demo shop | the app being recorded |
+| 4000 | payment gateway | the shop's external service (v11); ledger at `/v1/charges` |
 | 8081 | capture proxy | only while a capture session is running |
 | 5432 | — | **taken by another container (`rss-db`)**; Compose no longer binds it |
 | 9090 | Prometheus | `--profile observability` only |
@@ -51,6 +52,9 @@ Other containers on this machine, unrelated: `rss-db` (5432),
 | `INFRAREPLAY_ENCRYPTION_KEY` | — | v8: Fernet key, from `infractl security keygen` |
 | `INFRAREPLAY_LOG_FORMAT` | `json` | v9: `console` for humans |
 | `INFRAREPLAY_LOG_LEVEL` | `INFO` | v9 |
+| `INFRAREPLAY_DEMO_SHOP_URL` | `http://127.0.0.1:3000` | where real demo traffic is recorded from (Compose: `http://shop:3000`) |
+| `INFRAREPLAY_DEFAULT_TARGET` | the demo shop URL | what a replay targets when none is named — the live shop, never `mock` |
+| `INFRAREPLAY_BENCHMARK_DIR` | `benchmark/results` | where `/api/benchmarks/latest` reads `latest/summary.json` |
 
 Production-target refusal matches `prod`, `production`, `live` in the target
 string (`PROD_TARGET_MARKERS`).
@@ -63,6 +67,10 @@ string (`PROD_TARGET_MARKERS`).
 | `DEMO_SHOP_LOCK_INVENTORY` | `0` | `1` fixes the oversell bug |
 | `DEMO_SHOP_RACE_WINDOW_S` | `0.05` | width of the read-then-write window |
 | `DEMO_SHOP_PORT` | `3000` | port when run as `__main__` or in Docker |
+| `DEMO_SHOP_PAYMENTS_URL` | `http://127.0.0.1:4000` | the payment gateway (Compose: `http://payments:4000`) |
+| `DEMO_SHOP_PAYMENTS_KEY` | `gw_test_key_demo` | the shop's API key at the gateway (masked in captures) |
+| `PAYMENT_GATEWAY_KEY` | `gw_test_key_demo` | the key the gateway accepts |
+| `PAYMENT_GATEWAY_PORT` | `4000` | Docker entrypoint only |
 
 ## Correlation headers (the wire contract)
 

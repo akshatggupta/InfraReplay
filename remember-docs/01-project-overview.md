@@ -30,6 +30,7 @@ differences, all stated in `idea.md`:
 | HTTP capture | Starlette reverse proxy + httpx |
 | SQL capture | SQLAlchemy `before/after_cursor_execute` listeners, in the app's process |
 | Dashboard | NiceGUI (pure Python, no separate frontend build) |
+| Load testing | Locust, driven as a library (`benchmark/drive.py`) |
 | Metadata store | SQLite locally, Postgres under Compose |
 | Blobs | filesystem `StoragePlugin` (`storage_fs`) |
 | Tests | pytest + pytest-asyncio; Textual Pilot for the TUI |
@@ -59,6 +60,8 @@ infrareplay/
   security/     API keys, audit log, encryption keys (v8)
   observability/ Prometheus metrics, structlog JSON (v9)
 examples/demo_shop/   the recorded application, with its bug
+examples/payment_gateway/  the external service the shop pays through (v11)
+benchmark/            v10: run.sh, Locust workload, reports under results/
 migrations/           Alembic
 docker/               entrypoint, boot seeding, healthcheck
 docs/                 v1..v7 notes, roadmap, status.html
@@ -93,11 +96,11 @@ it held: adding real capture in v2/v3 changed nothing above the capture layer.
 | v7 | CLI completeness, export/import | **done** |
 | v8 | Security hardening (encryption at rest, API keys, audit log) | **done** (2026-10-08) |
 | v9 | Observability (Prometheus, structlog JSON) | **done** (2026-10-08) |
-| v10 | Benchmark suite (Locust, published methodology) | not started |
-| v11 | External service mocking on replay | not started |
+| v10 | Benchmark suite (Locust, published methodology) | **done** (2026-11-02) |
+| v11 | External service mocking on replay | **done** (2026-11-02) |
 | v12 | Third-party protocol plugin as a separate package | not started |
 
-**9 of 12 = 75%.** The user first asked for "60% ready" for a college
+**11 of 12 ≈ 92%** (was 9 of 12 = 75% before 2026-11-02). The user first asked for "60% ready" for a college
 presentation (v2–v7), then for "the next 2 versions" (v8, v9), then for
 "a cool TUI over all these" — `infractl tui`, see `docs/tui.md`.
 

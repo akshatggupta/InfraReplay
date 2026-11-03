@@ -110,3 +110,54 @@ again when it was built. The dashboard JSON is validated by a test against
 `/metrics`, and the Compose file parses with every mount present — but
 nobody has watched Grafana load it yet. First thing to do once Docker is on:
 `docker compose --profile observability up --build`, then open :3001.
+
+## 2026-11-02 → 03: v10, v11, and "nothing dummy"
+
+The ask: "tell me the completion percentage… at least 80%… real life prod
+work… nothing should be dummy… TUI should be also an option", for a
+presentation the next day. It started at 9/12 = 75% and ended at **11/12 ≈ 92%**.
+
+**First, the move.** The repo had moved from `/mnt/d` to `/mnt/e`; the venv's
+36 scripts and the editable install still pointed at `/mnt/d`, so `infractl`
+was dead. Repointed (gotcha §23). Memory copied to the `-mnt-e-` project dir.
+
+**v10 — benchmark suite.** `benchmark/run.sh` (Locust driven as a library by
+`drive.py`, psutil sampling, per-request completeness, the API's drop
+counter). Its first run found capture unusable under load:
+
+| Run | What it measured | Saved as |
+|---|---|---|
+| original code | −90% to −95% throughput, +1.6 s to +11 s on a checkout, 17 `database is locked` failures with silent event loss at heavy load | `results/before-pooling/` |
+| + WAL, retries, batching writer | failures gone, cost unchanged (−89% to −94%) | `results/robustness-only/` |
+| + pooled HTTP clients | light −25%, medium −64%; heavy row excluded (a test run overlapped it) | `results/pooled/` |
+| final code (v11 shop) | light −12.3%, medium −24.0%, heavy −45.7%; 100% complete, 0 dropped, 0 failures | `results/latest/` |
+
+Root cause of the overhead: an httpx client built per request in the proxy
+and the agent, 183 ms each (TLS bundle load). Also found: Locust's
+`--run-time` firing early; completeness by totals reading >100%.
+
+**v11 — external service mocking.** A real payment-gateway service
+(`examples/payment_gateway/`, `:4000`, with a ledger). The shop pays through
+it over HTTP on `agent.http_transport()`. Capture records the call; replay
+answers it from the recording (fails closed with 503 if none); `--externals
+live` opts in to real calls. Proof: the ledger count does not move on replay.
+
+**No dummy in the demo path.** `POST /api/demo/traffic` (+ `infractl demo
+traffic` / `race`, TUI `t` / `o`, dashboard buttons, Docker boot) records
+real checkouts through a real capture; replay defaults to the live shop; the
+inventory fix is a runtime flag (`control.sh fix on`). TUI gained a
+Benchmarks tab and a dropped-events tile.
+
+**The real end-to-end run found three bugs the tests missed** — now with
+regression tests (`test_demo_traffic.py`, mutation-checked): the CLI sent
+`stock: null` and skipped the restock; the "race" gave its two shoppers
+different baskets so it never raced; a declined card kept its reserved stock.
+It also surfaced a real trade-off, documented in `docs/v11.md`: `--externals
+live` sends masked card tokens, so a declined card is approved.
+
+Tests: **70 passed, 1 skipped** (71). Real transcript: `docs/demo-transcript.txt`.
+Status page republished as a NEW artifact
+(https://claude.ai/artifact/Uy7dD2KaUrz1qdLhzVqi37) because the old one and
+the teacher report doc live in another claude.ai organization this session
+could not reach. The Prometheus/Grafana profile is still unverified live
+(Docker's WSL integration was off).

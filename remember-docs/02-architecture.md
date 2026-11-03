@@ -131,3 +131,42 @@ is `AutoMode.OFF`.
   the loser's UPDATE matches no row and gets 409.
 
 Auth is the `x-demo-user` header on purpose — see `05-gotchas.md`.
+
+## v11: outbound calls — recorded on capture, answered on replay
+
+`infrareplay/agent/egress.py`. The app builds its outbound HTTP client on
+`agent.http_transport()` (a `CapturingTransport`); the demo shop's payment
+client does. Three modes, chosen per request from the capture context:
+
+```
+no capture context   → plain pass-through, nothing recorded
+capture              → real call, recorded as http.request/response with
+                        direction: "outbound", in the inbound request's group
+replay (default)     → NOT sent; the recorded answer is returned
+                        (GET /api/recordings/{id}/externals?correlation_id=…);
+                        no recorded answer → 503 external_call_not_recorded
+replay + "live"      → really sent (explicit opt-in only)
+```
+
+The replay engine tells the target which original request each replayed one
+reproduces: `x-infrareplay-replay-of` and `x-infrareplay-source-correlation`
+(plus `x-infrareplay-externals`). The agent's middleware binds them into the
+context; the transport matches calls by `METHOD host/path`, the Nth identical
+call getting the Nth recorded answer. Only inbound requests are replayed.
+Correlation hangs an outbound request under the inbound one (its group's
+first request).
+
+Proof is external, not internal: the payment gateway keeps a ledger of every
+charge (`GET /v1/charges`), and the integration test shows its count does not
+move on replay.
+
+## v10: performance lessons now in the code
+
+- One pooled HTTP connection per component (proxy: a bare transport, so no
+  cookie jar is shared between users; agent: one client). Never build an httpx
+  client in a request path.
+- The capture writer batches whatever is queued into one transaction and can
+  never die; a batch that fails after retries is counted, not lost silently.
+- SQLite in WAL mode with a 30 s busy timeout; event writes retry on a lock.
+- The remaining ceiling under load is the single API process (proxy + ingest +
+  writes in one event loop). Not addressed; stated in `docs/v10.md`.

@@ -182,3 +182,80 @@ renderer artefact, not a TUI bug.
 
 It was on on 2026-09-23 and off again on 2026-10-08 (`docker` not found).
 Check `docker version` before planning anything that needs it.
+
+---
+
+## Found on 2026-11-02 (v10, v11, the move to /mnt/e)
+
+## 23. Moving the repo breaks the venv in two places
+
+After the move from `/mnt/d` to `/mnt/e`, `import infrareplay` still worked
+from the repo root (cwd is on `sys.path`) but **`infractl`, `uvicorn` and
+`pytest` were dead**: their shebangs pointed at `/mnt/d/.../python3`, and the
+editable install's finder mapped the package to `/mnt/d`. Fix:
+
+```bash
+grep -l '/mnt/d/InfraReplay' .venv/bin/* | xargs sed -i 's#/mnt/d/InfraReplay#/mnt/e/InfraReplay#g'
+.venv/bin/python -m pip install -e . --no-deps --no-build-isolation
+```
+
+Stale `__pycache__` also kept old paths in tracebacks; delete them.
+
+## 24. Building an httpx client costs ~183 ms here
+
+`httpx.AsyncClient()` loads a TLS certificate bundle; on this slow disk that
+is 183 ms median, up to 1 s. The capture proxy and the agent used to build
+one **per request** — that was most of capture's overhead (v10 found it).
+Never create an httpx client inside a request path; keep one per component.
+The proxy uses a bare `AsyncHTTPTransport`, not a client, so no cookie jar
+is shared between users.
+
+## 25. Locust's `--run-time` fires early on a slow filesystem
+
+The timer runs on gevent's loop clock, which is stale after Locust's slow
+imports; a "10 s" run measured 4 s. `benchmark/drive.py` drives Locust as a
+library and times the window itself. Don't go back to the CLI flag.
+
+## 26. Never run tests while a benchmark is measuring
+
+They compete for CPU. It happened once: the heavy level of the `pooled` run
+is contaminated and excluded from the docs. Run benchmarks alone.
+
+## 27. Don't chain a restore after a command that can fail
+
+`sed … report.md && cp <restore>` — the sed failed (file missing), `&&`
+skipped the restore, and a "fixed" benchmark ran on unfixed code. That run
+became `results/robustness-only/` (honestly relabelled). Verify file state
+(`grep -c` for the change) before measuring.
+
+## 28. SQLite needs WAL and a real busy timeout under load
+
+Default lock wait is 5 s; under heavy capture the API hit `database is
+locked` and dropped events. `db/engine.py` now sets WAL and 30 s for SQLite.
+The capture writer batches and never dies; drops are counted in
+`infrareplay_events_dropped_total`.
+
+## 29. Completeness by totals reads over 100%
+
+Requests in flight when load stops are captured but not counted by Locust.
+Completeness is judged per request (each captured request has all its
+events), not by comparing totals.
+
+## 30. The demo shop seeds 1 unit per product
+
+Ordinary traffic must restock first or the second checkout gets 409.
+`/api/demo/traffic` restocks to 100 by default; the race passes `stock: 1`.
+Before replaying the race on stage: `examples/demo_shop/control.sh restock 1`.
+
+## 31. Outbound calls are `http.request`/`http.response` with `direction: "outbound"`
+
+No schema change was needed for v11, but anything that iterates HTTP events
+must decide whether it wants inbound only: the replay engine skips outbound
+requests (the app makes them again), and tests counting "the client's
+statuses" must filter them out (`test_live_replay._statuses`).
+
+## 32. TUI tests: wait for conditions, not for time
+
+A fixed `pause(6)` passed alone and failed in the full suite on this slow
+disk. `test_tui._until()` waits for a row / screen to appear, with a 30 s
+ceiling.

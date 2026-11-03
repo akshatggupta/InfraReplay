@@ -2,7 +2,8 @@
 
 Handoff notes for picking InfraReplay up in a **new Claude Code session**
 (or on another machine). Written 2026-10-08, covering the session that ran
-2026-09-21 → 2026-10-08, and updated the same day after v8, v9 and the TUI.
+2026-09-21 → 2026-10-08, updated after v8, v9 and the TUI, and again on
+2026-11-03 after v10, v11, the real-traffic demo and the move to `/mnt/e`.
 
 Read them in this order; each is standalone.
 
@@ -23,14 +24,18 @@ InfraReplay records a real HTTP + PostgreSQL workflow, replays it somewhere
 else, and diffs the two runs — so reproducing an incident stops being a
 guessing game. Core loop: **capture → correlate → store → replay → compare**.
 
-The build spec (`idea.md`) breaks it into twelve versions. **v1–v9 are
-done** (75%): the whole pipeline on real traffic with a real concurrency
-bug caught end to end, plus security hardening (v8) and observability (v9).
-There is also a terminal UI, `infractl tui`. v10–v12 have not been
-started — and should not be started without being asked.
+The build spec (`idea.md`) breaks it into twelve versions. **v1–v11 are
+done** (≈92%): the pipeline on real traffic, a real concurrency bug caught end
+to end, security (v8), observability (v9), a published benchmark (v10), and
+replays that answer the shop's payment calls from the recording (v11). There
+is a terminal UI, `infractl tui`. Only v12 remains — do not start it unasked.
 
-Everything is committed on `main`. Pushed through `01fc4ec`; the v8, v9
-and TUI commits (through `7bd18c0`) were **not pushed** as of 2026-10-08.
+The demo path records **real** traffic (`infractl demo traffic`), not
+fixtures. The repo lives at `/mnt/e/InfraReplay`.
+
+Push state: GitHub push protection blocks pushing `main` (a fake
+`sk_live_…`-shaped string in `ae0db27`'s `tests/unit/test_security.py`) until
+the user allows it via GitHub's unblock link or approves a history rewrite.
 
 ## If you are a fresh Claude session
 

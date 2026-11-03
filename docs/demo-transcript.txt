@@ -1,0 +1,73 @@
+$ infractl demo traffic
+rec_96b813950177  [completed]  Checkout — live traffic
+  62 events · responses 201, 201, 402 · 3 payment-gateway calls
+
+$ examples/demo_shop/control.sh ledger   # the payment gateway's own count
+charges: 3
+
+$ infractl replay rec_96b813950177
+replay rpl_0ee03e95723b against http://127.0.0.1:3000
+summary: {'MATCH': 31, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
+
+$ examples/demo_shop/control.sh ledger
+charges: 3   <- unchanged: the replay charged nobody
+
+$ infractl recordings show rpl_0ee03e95723b   # the replay's payment calls
+ outbound 200 stubbed = True
+ outbound 200 stubbed = True
+ outbound 402 stubbed = True
+
+$ infractl replay rec_96b813950177 --externals live
+replay rpl_9e97ec194563 against http://127.0.0.1:3000
+summary: {'MATCH': 28, 'DIFFERENT': 2, 'MISSING': 1, 'NEW': 0, 'ERROR': 0}
+# live: the gateway is really called — with the card token as stored, masked,
+# so the declined card is approved this time. Why recorded is the default.
+
+$ examples/demo_shop/control.sh ledger
+charges: 6   <- only when asked: --externals live
+
+$ infractl demo race
+rec_f222456c3278  [completed]  Checkout — oversell race
+  36 events · responses 201, 201 · 2 payment-gateway calls
+
+$ examples/demo_shop/control.sh restock 1
+{"reset":true,"stock":1,"reserve":"read_then_write"}
+
+$ infractl replay rec_f222456c3278 --concurrency 2
+replay rpl_2a76b7632f42 against http://127.0.0.1:3000
+summary: {'MATCH': 18, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
+
+$ examples/demo_shop/control.sh fix on
+{"reserve":"atomic"}
+
+$ examples/demo_shop/control.sh restock 1
+{"reset":true,"stock":1,"reserve":"atomic"}
+
+$ infractl replay rec_f222456c3278 --concurrency 2
+replay rpl_ddc11016ef9f against http://127.0.0.1:3000
+summary: {'MATCH': 13, 'DIFFERENT': 2, 'MISSING': 3, 'NEW': 0, 'ERROR': 0}
+
+$ infractl compare rpl_ddc11016ef9f | grep -v ^MATCH
+DIFFERENT  postgres.result  {'rows_affected': {'original': 1, 'replayed': 0}}
+DIFFERENT  http.response    {'status': {'original': 200, 'replayed': 409}, 'body': {'original': {'id': '<id>', 'status': 'succeeded', 'amount_cents': 4978, 'currency': 'g
+MISSING    postgres.result  
+MISSING    postgres.result  
+MISSING    http.response    
+
+$ infractl replay rec_96b813950177 --target https://api.production.example.com
+error 400: target 'https://api.production.example.com' looks like production; pass unsafe to override
+
+$ infractl benchmark show
+run 2026-11-02T19:49:58+00:00 · 12th Gen Intel(R) Core(TM) i5-12500H
+load     users  throughput  p50 added  p95 added  complete  dropped
+light        5      -12.3%     +33 ms     +40 ms    100.0%        0
+medium      20      -24.0%    +150 ms      +0 ms    100.0%        0
+heavy       50      -45.7%    +950 ms   +1800 ms    100.0%        0
+
+$ infractl audit list --limit 6
+2026-11-02T20:16:35  failed replay.run        anonymous    rec_96b813950177  https://api.production.example.com
+2026-11-02T20:16:10  ok     replay.run        anonymous    rec_f222456c3278  http://127.0.0.1:3000
+2026-11-02T20:16:01  ok     replay.run        anonymous    rec_f222456c3278  http://127.0.0.1:3000
+2026-11-02T20:15:45  ok     demo.traffic      anonymous    rec_f222456c3278  http://127.0.0.1:3000
+2026-11-02T20:15:36  ok     replay.run        anonymous    rec_96b813950177  http://127.0.0.1:3000
+2026-11-02T20:15:10  ok     replay.run        anonymous    rec_96b813950177  http://127.0.0.1:3000

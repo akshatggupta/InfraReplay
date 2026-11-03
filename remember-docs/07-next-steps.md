@@ -7,18 +7,9 @@ until v(N)'s DoD passes. The user's standing instruction (also in memory) is
 that the remaining versions are **not** to be started unprompted. v1–v9 is
 the agreed scope (v8 and v9 were explicitly requested on 2026-10-08).
 
-## The remaining three versions
+## The remaining version
 
-**v8 and v9 are done** — see `docs/v8.md`, `docs/v9.md`.
-
-**v10 — Benchmark suite.** Locust against the demo shop with and without
-capture: req/s, P50/P95/P99, CPU, memory, captured bytes/sec at light /
-medium / heavy load. `benchmark/run.sh` must produce a reproducible report.
-Until this exists, publish no performance numbers.
-
-**v11 — External service mocking.** Stub payment/email/SMS/shipping APIs so
-replay never hits real external services — and make that the default, with
-no flag.
+**v8–v11 are done** — see `docs/v8.md` … `docs/v11.md`.
 
 **v12 — Third-party protocol plugin.** One external capture plugin (Kafka is
 the best proof) as a *separately installable* package that registers itself
@@ -39,7 +30,14 @@ with zero core changes: `pip install infrareplay-kafka-capture` then
   stream into the page; you stop it and reload.
 - **`docker/entrypoint.sh` runs as root** and the all-in-one container holds
   three services. Fine for a demo, wrong for anything else.
-- **Verify the observability profile live** once Docker is on (see `03`).
+- **Verify the observability profile live** once Docker is on (see `03`) —
+  still not seen running as of 2026-11-02.
+- **Lift the captured-throughput ceiling**: several API workers, or the capture
+  proxy in its own process (the v10 report shows the single API process
+  saturating under medium/heavy load). Measure before and after.
+- **Capture other egress**: only HTTP through the instrumented client is
+  recorded/stubbed (v11). SMTP, raw sockets and libraries with their own
+  HTTP stack are not.
 - **The TUI has no live stream of a capture in progress** — the timeline
   is loaded once; stop the capture to see it.
 - **No CI.** Everything was verified by hand plus `pytest`. A GitHub Actions

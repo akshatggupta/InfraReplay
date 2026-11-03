@@ -1,13 +1,29 @@
 # 04 · Running it, and the demo script
 
+## Real demo traffic (no fixtures)
+
+```bash
+infractl demo traffic       # 3 real checkouts through a live capture, 1 card declined
+infractl demo race          # the oversell race: stock reset to 1, 2 shoppers at once
+examples/demo_shop/control.sh restock 1 | fix on | fix off | orders | ledger
+infractl replay <id>                     # against the live shop by default
+infractl replay <id> --externals live    # only then does the gateway really get called
+infractl benchmark show                  # the latest benchmark report
+benchmark/run.sh                         # rerun it (~7 min; run nothing else meanwhile)
+```
+
+`infractl demo seed` still exists but makes the two **synthetic** fixtures —
+for tests and offline use only, not the demo.
+
 ## The TUI
 
 ```bash
 infractl tui      # needs the API running; honours INFRAREPLAY_API_URL / _API_KEY
 ```
 
-`1`–`5` switch tabs (overview, recordings, captures, audit, plugins), `enter`
-opens, `r` replays / refreshes, `x` stops a capture, `e` exports, `q` quits.
+`1`–`6` switch tabs (overview, recordings, captures, audit, plugins, benchmarks),
+`t` records real traffic, `o` records the race, `enter` opens, `r` replays /
+refreshes, `x` stops a capture, `e` exports, `q` quits.
 Full guide: `docs/tui.md`.
 
 ## Observability stack

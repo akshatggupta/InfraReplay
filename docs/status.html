@@ -428,13 +428,18 @@
     .cols { grid-template-columns: 1fr; }
     .ticks { grid-template-columns: repeat(6, 1fr); }
   }
+
+  .num-good { color: var(--good); font-variant-numeric: tabular-nums; }
+  .num-bad { color: var(--amber); font-variant-numeric: tabular-nums; }
+  td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+  .note { font-size: 0.82rem; color: var(--muted); margin-top: 12px; max-width: 72ch; }
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <header>
-    <p class="eyebrow">Build status · 21 September 2026</p>
+    <p class="eyebrow">Build status · 2 November 2026</p>
     <h1>InfraReplay</h1>
     <p class="lede">
       Record a real HTTP + PostgreSQL workflow, replay it somewhere else, and get an
@@ -442,30 +447,20 @@
     </p>
 
     <div class="facts">
-      <span><b>7 of 12</b> versions shipped</span>
-      <span><b>58%</b> of the roadmap</span>
-      <span><b>35</b> tests green</span>
-      <span><b>~3,000</b> lines of Python</span>
+      <span><b>11 of 12</b> versions shipped</span>
+      <span><b>92%</b> of the roadmap</span>
+      <span><b>71</b> automated tests</span>
+      <span><b>~11,200</b> lines of Python</span>
     </div>
 
     <div class="track">
       <div class="ticks">
-        <div class="tick done">v1</div>
-        <div class="tick done">v2</div>
-        <div class="tick done">v3</div>
-        <div class="tick done">v4</div>
-        <div class="tick done">v5</div>
-        <div class="tick done">v6</div>
-        <div class="tick done">v7</div>
-        <div class="tick">v8</div>
-        <div class="tick">v9</div>
-        <div class="tick">v10</div>
-        <div class="tick">v11</div>
+        <div class="tick done">v1</div><div class="tick done">v2</div><div class="tick done">v3</div><div class="tick done">v4</div><div class="tick done">v5</div><div class="tick done">v6</div><div class="tick done">v7</div><div class="tick done">v8</div><div class="tick done">v9</div><div class="tick done">v10</div><div class="tick done">v11</div>
         <div class="tick">v12</div>
       </div>
       <div class="legend">
-        <span>shipped · pipeline complete on real traffic</span>
-        <span>remaining · hardening and proof</span>
+        <span>shipped · real traffic, secured, observable, measured</span>
+        <span>remaining · v12, a third-party plugin</span>
       </div>
     </div>
   </header>
@@ -473,73 +468,53 @@
   <section>
     <div class="head">
       <h2>The loop</h2>
-      <span class="eyebrow">every stage now runs on real traffic</span>
+      <span class="eyebrow">every stage runs on real traffic</span>
     </div>
 
     <div class="pipe">
-      <div class="stage">
-        <div class="n">01</div>
-        <h3>Capture</h3>
-        <p>A reverse proxy records the request and response; SQLAlchemy listeners inside the app record the queries it runs.</p>
-      </div>
-      <div class="stage">
-        <div class="n">02</div>
-        <h3>Correlate</h3>
-        <p>One correlation id travels from proxy to app, so every query knows which request caused it.</p>
-      </div>
-      <div class="stage">
-        <div class="n">03</div>
-        <h3>Store</h3>
-        <p>Metadata in Postgres, payload snapshots in blob storage, secrets masked before either.</p>
-      </div>
-      <div class="stage">
-        <div class="n">04</div>
-        <h3>Replay</h3>
-        <p>The recorded requests are re-sent at a live service — one at a time, or concurrently to reproduce a race.</p>
-      </div>
-      <div class="stage">
-        <div class="n">05</div>
-        <h3>Compare</h3>
-        <p>Matched event pairs are diffed after fresh ids and clocks are normalised away.</p>
-      </div>
+      <div class="stage"><div class="n">01</div><h3>Capture</h3>
+        <p>A reverse proxy records each request; the app's agent records the SQL it ran and the calls it made to other services.</p></div>
+      <div class="stage"><div class="n">02</div><h3>Correlate</h3>
+        <p>One correlation id ties every query and outbound call to the request that caused it.</p></div>
+      <div class="stage"><div class="n">03</div><h3>Store</h3>
+        <p>Secrets masked before anything is written; snapshots optionally encrypted at rest; every action audited.</p></div>
+      <div class="stage"><div class="n">04</div><h3>Replay</h3>
+        <p>The requests are re-sent to a live service; its calls to payments are answered from the recording.</p></div>
+      <div class="stage"><div class="n">05</div><h3>Compare</h3>
+        <p>Each pair diffed after fresh ids and clocks are normalised, down to the field that changed.</p></div>
     </div>
   </section>
 
   <section>
     <div class="head">
-      <h2>What changed</h2>
-      <span class="eyebrow">v1 was the demo · v2–v7 made it real</span>
+      <h2>What was built</h2>
+      <span class="eyebrow">the foundation, then the production work</span>
     </div>
 
     <div class="cols">
       <div class="col">
-        <span class="eyebrow">Already built</span>
-        <h3>v1 — the pipeline, on synthetic data</h3>
-        <p style="font-size:0.88rem;color:var(--muted);margin-top:6px">
-          Every layer the product needs was real; only the data source was fake.
-        </p>
+        <span class="eyebrow">Foundation · v1 – v7</span>
+        <h3>The pipeline, on real traffic</h3>
         <ul>
-          <li><b>Event schema</b> with versioning and a migration registry.</li>
-          <li><b>Plugin registry</b> loading entry points, validating each against its ABC — no core code imports a plugin.</li>
-          <li><b>Mock capture</b> generating a believable checkout, clean and buggy.</li>
-          <li><b>Replay + comparison engines</b>, filesystem storage, default redaction.</li>
-          <li><b>API, CLI and dashboard</b> — one source of truth, two thin clients.</li>
+          <li><span class="vtag">v1</span><b>The whole pipeline</b> — schema, plugin registry, storage, replay, comparison, API, CLI, web dashboard.</li>
+          <li><span class="vtag">v2</span><b>HTTP capture</b> with a reverse proxy.</li>
+          <li><span class="vtag">v3</span><b>SQL capture</b>, every query tied to its request.</li>
+          <li><span class="vtag">v4</span><b>Live replay</b>, with concurrency to reproduce races.</li>
+          <li><span class="vtag">v5</span><b>Comparison</b> that ignores fresh ids and clocks, not real changes.</li>
+          <li><span class="vtag">v6</span><b>A demo shop</b> with a real overselling bug.</li>
+          <li><span class="vtag">v7</span><b>Export and import</b> of a recording as one file.</li>
         </ul>
       </div>
 
       <div class="col now">
-        <span class="eyebrow">This push</span>
-        <h3>v2 – v7 — the same pipeline, on real traffic</h3>
-        <p style="font-size:0.88rem;color:var(--muted);margin-top:6px">
-          Nothing above the capture layer was rewritten. That was the bet v1 made.
-        </p>
+        <span class="eyebrow">Production work · v8 – v11 + TUI</span>
+        <h3>Secured, observable, measured, safe to replay</h3>
         <ul>
-          <li><span class="vtag">v2</span><b>HTTP capture.</b> A Starlette reverse proxy with body limits; real headers redacted on the way in.</li>
-          <li><span class="vtag">v3</span><b>SQL capture + correlation.</b> In-app SQLAlchemy listeners; the app streams its queries back before the response leaves.</li>
-          <li><span class="vtag">v4</span><b>Live replay.</b> Requests really sent, real answers recorded, dynamic values substituted, races reproducible.</li>
-          <li><span class="vtag">v5</span><b>Comparison hardening.</b> Generated ids, UUIDs, timestamps and per-hop headers normalised before the diff.</li>
-          <li><span class="vtag">v6</span><b>Demo shop + a real bug.</b> A checkout that oversells under concurrency, and a one-line fix to switch it off.</li>
-          <li><span class="vtag">v7</span><b>Export / import.</b> A recording leaves as one file and replays on another instance.</li>
+          <li><span class="vtag">v8</span><b>Security.</b> Secrets masked by name and by shape, files encrypted at rest, API keys, audit log.</li>
+          <li><span class="vtag">v9</span><b>Observability.</b> Prometheus metrics, JSON logs, a Grafana dashboard.</li>
+          <li><span class="vtag">v10</span><b>Benchmarks.</b> Real load tests; they found capture was unusable under load, and the fixes below.</li>
+          <li><span class="vtag">v11</span><b>External services.</b> The shop pays through a separate gateway service; a replay never charges a card twice.</li>
+          <li><span class="vtag">TUI</span><b>A terminal UI</b> over everything: live metrics, real traffic, replay, comparison, audit, benchmarks.</li>
         </ul>
       </div>
     </div>
@@ -547,106 +522,177 @@
 
   <section>
     <div class="head">
-      <h2>Does it actually work</h2>
-      <span class="eyebrow">recorded from a live run, not written by hand</span>
+      <h2>Real, not synthetic</h2>
+      <span class="eyebrow">a live run, output unedited</span>
     </div>
 
     <p style="margin-bottom:20px">
-      One unit in stock, two shoppers checking out at the same moment. The shop confirms
-      both orders — it oversells. The recording is then replayed against the buggy shop,
-      and against the fixed one.
+      Real checkouts through a real capture, a replay that does not charge anyone — proven by the
+      payment gateway's own ledger — and the overselling race reproduced, fixed with a feature flag,
+      and shown fixed.
     </p>
 
     <div class="term">
-      <div class="bar">infractl · capture → replay → compare</div>
-<pre><span class="cmd">$ infractl capture start --listen :8082 --upstream :3000</span>
-rec_3856638fb164  listening :8082 -&gt; http://127.0.0.1:3000
+      <div class="bar">infractl · traffic → replay → ledger → race → fix → compare</div>
+<pre><span class="cmd">$ infractl demo traffic</span>
+rec_96b813950177  [completed]  Checkout — live traffic
+  62 events · responses 201, 201, 402 · 3 payment-gateway calls
 
-<span class="dim"># two checkouts, fired together, through the proxy</span>
-<span class="cmd">$ curl localhost:3000/api/v1/orders</span>
-{"confirmed_orders": 2, "stock_left": 1}      <span class="warn">&lt;- one unit sold twice</span>
+<span class="cmd">$ examples/demo_shop/control.sh ledger   # the payment gateway's own count</span>
+charges: 3
 
-<span class="cmd">$ infractl capture stop rec_3856638fb164</span>
-rec_3856638fb164  [completed]  32 events
+<span class="cmd">$ infractl replay rec_96b813950177</span>
+replay rpl_0ee03e95723b against http://127.0.0.1:3000
+summary: {'MATCH': 31, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
 
-<span class="cmd">$ infractl replay rec_3856638fb164 --target http://127.0.0.1:3000 --concurrency 2</span>
-summary: {'MATCH': 16, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
-<span class="dim"># replayed against the buggy shop: the bug reproduces exactly</span>
+<span class="cmd">$ examples/demo_shop/control.sh ledger</span>
+<span class="ok">charges: 3   &lt;- unchanged: the replay charged nobody</span>
 
-<span class="dim"># fix the reservation, replay the same recording again</span>
-<span class="cmd">$ DEMO_SHOP_LOCK_INVENTORY=1 uvicorn examples.demo_shop.app:app --port 3000</span>
-<span class="cmd">$ infractl replay rec_3856638fb164 --target http://127.0.0.1:3000 --concurrency 2</span>
-summary: {'MATCH': 12, 'DIFFERENT': 2, 'MISSING': 2, 'NEW': 0, 'ERROR': 0}
+<span class="cmd">$ infractl recordings show rpl_0ee03e95723b   # the replay's payment calls</span>
+ outbound 200 stubbed = True
+ outbound 200 stubbed = True
+ outbound 402 stubbed = True
 
-DIFFERENT  postgres.result  rows_affected 1 -&gt; 0
-DIFFERENT  http.response    status 201 -&gt; 409  body: {'error': 'out_of_stock'}   <span class="ok">&lt;- the fix, named</span>
-</pre>
+<span class="cmd">$ infractl replay rec_96b813950177 --externals live</span>
+replay rpl_9e97ec194563 against http://127.0.0.1:3000
+summary: {'MATCH': 28, 'DIFFERENT': 2, 'MISSING': 1, 'NEW': 0, 'ERROR': 0}
+# live: the gateway is really called — with the card token as stored, masked,
+# so the declined card is approved this time. Why recorded is the default.
+
+<span class="cmd">$ examples/demo_shop/control.sh ledger</span>
+<span class="ok">charges: 6   &lt;- only when asked: --externals live</span>
+
+<span class="cmd">$ infractl demo race</span>
+rec_f222456c3278  [completed]  Checkout — oversell race
+  36 events · responses 201, 201 · 2 payment-gateway calls
+
+<span class="cmd">$ examples/demo_shop/control.sh restock 1</span>
+{"reset":true,"stock":1,"reserve":"read_then_write"}
+
+<span class="cmd">$ infractl replay rec_f222456c3278 --concurrency 2</span>
+replay rpl_2a76b7632f42 against http://127.0.0.1:3000
+summary: {'MATCH': 18, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
+
+<span class="cmd">$ examples/demo_shop/control.sh fix on</span>
+{"reserve":"atomic"}
+
+<span class="cmd">$ examples/demo_shop/control.sh restock 1</span>
+{"reset":true,"stock":1,"reserve":"atomic"}
+
+<span class="cmd">$ infractl replay rec_f222456c3278 --concurrency 2</span>
+replay rpl_ddc11016ef9f against http://127.0.0.1:3000
+summary: {'MATCH': 13, 'DIFFERENT': 2, 'MISSING': 3, 'NEW': 0, 'ERROR': 0}
+
+<span class="cmd">$ infractl compare rpl_ddc11016ef9f | grep -v ^MATCH</span>
+<span class="warn">DIFFERENT  postgres.result  {'rows_affected': {'original': 1, 'replayed': 0}}</span>
+<span class="warn">DIFFERENT  http.response    {'status': {'original': 200, 'replayed': 409}, 'body': {'original': {'id': '&lt;id&gt;', 'status': 'succeeded', 'amount_cents': 4978, 'currency': 'g</span>
+<span class="warn">MISSING    postgres.result  </span>
+<span class="warn">MISSING    postgres.result  </span>
+<span class="warn">MISSING    http.response    </span>
+
+<span class="cmd">$ infractl replay rec_96b813950177 --target https://api.production.example.com</span>
+<span class="warn">error 400: target 'https://api.production.example.com' looks like production; pass unsafe to override</span>
+
+<span class="cmd">$ infractl benchmark show</span>
+run 2026-11-02T19:49:58+00:00 · 12th Gen Intel(R) Core(TM) i5-12500H
+load     users  throughput  p50 added  p95 added  complete  dropped
+light        5      -12.3%     +33 ms     +40 ms    100.0%        0
+medium      20      -24.0%    +150 ms      +0 ms    100.0%        0
+heavy       50      -45.7%    +950 ms   +1800 ms    100.0%        0
+
+<span class="cmd">$ infractl audit list --limit 6</span>
+2026-11-02T20:16:35  failed replay.run        anonymous    rec_96b813950177  https://api.production.example.com
+2026-11-02T20:16:10  ok     replay.run        anonymous    rec_f222456c3278  http://127.0.0.1:3000
+2026-11-02T20:16:01  ok     replay.run        anonymous    rec_f222456c3278  http://127.0.0.1:3000
+2026-11-02T20:15:45  ok     demo.traffic      anonymous    rec_f222456c3278  http://127.0.0.1:3000
+2026-11-02T20:15:36  ok     replay.run        anonymous    rec_96b813950177  http://127.0.0.1:3000
+2026-11-02T20:15:10  ok     replay.run        anonymous    rec_96b813950177  http://127.0.0.1:3000</pre>
     </div>
-
-    <p style="margin-top:18px">
-      The comparison does not just say "something changed". It says the reserving
-      <span class="mono">UPDATE</span> now matches no row, and the second shopper is turned
-      away instead of being sold stock that does not exist.
-    </p>
   </section>
 
   <section>
     <div class="head">
-      <h2>How capture crosses two processes</h2>
-      <span class="eyebrow">the part that was harder than the sketch</span>
+      <h2>What capture costs — measured</h2>
+      <span class="eyebrow">v10 · Locust, 30 s per run, direct vs captured</span>
+    </div>
+
+    <p style="margin-bottom:20px">
+      The first benchmark run showed capture was unusable under load, and that it lost data.
+      An HTTP client was built for every request — 183 ms each — and SQLite locks were dropping
+      events. The fixes, measured on the same setup:
+    </p>
+    
+<div class="tablewrap"><table>
+  <thead><tr><th>Load</th><th class="r">Throughput cost, first run</th><th class="r">After the fixes</th>
+  <th class="r">Median checkout added, first run</th><th class="r">After the fixes</th></tr></thead>
+  <tbody>
+    <tr><td>light · 5 users</td><td class="r num-bad">−89.7%</td><td class="r num-good">−25.0%</td>
+        <td class="r num-bad">+1,572 ms</td><td class="r num-good">+65 ms</td></tr>
+    <tr><td>medium · 20 users</td><td class="r num-bad">−92.1%</td><td class="r num-good">−63.9%</td>
+        <td class="r num-bad">+4,600 ms</td><td class="r num-good">+414 ms</td></tr>
+  </tbody>
+</table></div>
+    <p class="note">The heavy level of the after-run is excluded: a test suite ran on the same machine
+      during it. Saved runs: <span class="mono">benchmark/results/</span>.</p>
+
+    <p style="margin:28px 0 20px">The published numbers, on the finished code:</p>
+    
+<div class="tablewrap"><table>
+  <thead><tr><th>Load</th><th class="r">Direct req/s</th><th class="r">Captured req/s</th>
+  <th class="r">Throughput</th><th class="r">Median checkout added</th>
+  <th class="r">Complete requests</th><th class="r">Events dropped</th></tr></thead>
+  <tbody><tr><td>light · 5 users</td><td class='r'>24.9</td><td class='r'>21.8</td><td class='r'>-12.3%</td><td class='r'>+33.0 ms</td><td class='r num-good'>100.0%</td><td class='r num-good'>0</td></tr><tr><td>medium · 20 users</td><td class='r'>29.4</td><td class='r'>22.3</td><td class='r'>-24.0%</td><td class='r'>+150.0 ms</td><td class='r num-good'>100.0%</td><td class='r num-good'>0</td></tr><tr><td>heavy · 50 users</td><td class='r'>46.8</td><td class='r'>25.4</td><td class='r'>-45.7%</td><td class='r'>+950.0 ms</td><td class='r num-good'>100.0%</td><td class='r num-good'>0</td></tr></tbody>
+</table></div>
+    <p class="note">Final run 2026-11-02T19:49:58+00:00 on 12th Gen Intel(R) Core(TM) i5-12500H, 16 logical cores, 7.6 GB RAM; SQLite; every checkout also calls the payment gateway over HTTP. Full report and method: <span class='mono'>benchmark/results/latest/report.md</span>.</p>
+  </section>
+
+  <section>
+    <div class="head">
+      <h2>How capture crosses three processes</h2>
+      <span class="eyebrow">proxy, application, external service</span>
     </div>
 
     <figure class="figure">
-      <svg viewBox="0 0 700 250" role="img" aria-label="A client calls the capture proxy, which forwards to the app carrying a correlation id; the app's agent posts its SQL events to the ingest API before the response returns, and both streams land in one recording.">
+      <svg viewBox="0 0 760 260" role="img" aria-label="The proxy records the request, the shop's agent records its SQL and its call to the payment gateway, and all of it lands in one recording; on replay the gateway call is answered from the recording.">
         <defs>
           <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
             <path d="M0,0 L8,3 L0,6 Z" fill="currentColor"></path>
           </marker>
         </defs>
-
         <g fill="none" stroke="currentColor" color="var(--dim)" stroke-width="1.4">
-          <line x1="96" y1="46" x2="182" y2="46" marker-end="url(#ar)"></line>
-          <line x1="318" y1="46" x2="404" y2="46" marker-end="url(#ar)"></line>
-          <line x1="250" y1="76" x2="250" y2="176" marker-end="url(#ar)"></line>
-          <path d="M470 76 L470 140 L370 140" marker-end="url(#ar)"></path>
-          <line x1="330" y1="176" x2="330" y2="176"></line>
+          <line x1="96" y1="46" x2="170" y2="46" marker-end="url(#ar)"></line>
+          <line x1="306" y1="46" x2="380" y2="46" marker-end="url(#ar)"></line>
+          <line x1="516" y1="46" x2="590" y2="46" marker-end="url(#ar)"></line>
+          <line x1="238" y1="70" x2="238" y2="176" marker-end="url(#ar)"></line>
+          <path d="M448 70 L448 140 L360 140 L360 176" marker-end="url(#ar)"></path>
         </g>
-
         <g font-family="IBM Plex Mono, ui-monospace, Menlo, monospace" font-size="11">
-          <g>
-            <rect x="16" y="28" width="80" height="36" rx="7" fill="var(--sunk)" stroke="var(--line)"></rect>
-            <text x="56" y="51" text-anchor="middle" fill="var(--muted)">client</text>
-          </g>
-
-          <g>
-            <rect x="182" y="24" width="136" height="44" rx="8" fill="var(--signal-soft)" stroke="var(--signal)"></rect>
-            <text x="250" y="42" text-anchor="middle" fill="var(--signal)">capture proxy</text>
-            <text x="250" y="58" text-anchor="middle" fill="var(--muted)" font-size="10">http.request / response</text>
-          </g>
-
-          <g>
-            <rect x="404" y="24" width="136" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"></rect>
-            <text x="472" y="42" text-anchor="middle" fill="var(--text)">demo_shop</text>
-            <text x="472" y="58" text-anchor="middle" fill="var(--muted)" font-size="10">SQLAlchemy listeners</text>
-          </g>
-
-          <g>
-            <rect x="200" y="176" width="300" height="52" rx="8" fill="var(--panel)" stroke="var(--line)"></rect>
-            <text x="350" y="198" text-anchor="middle" fill="var(--text)">one recording</text>
-            <text x="350" y="214" text-anchor="middle" fill="var(--muted)" font-size="10">grouped by correlation id, ordered by clock</text>
-          </g>
-
-          <text x="250" y="18" text-anchor="middle" fill="var(--dim)" font-size="10">x-infrareplay-correlation-id</text>
-          <text x="386" y="132" text-anchor="end" fill="var(--dim)" font-size="10">POST /api/captures/{id}/events</text>
-          <text x="262" y="126" fill="var(--dim)" font-size="10">append</text>
+          <rect x="16" y="28" width="80" height="36" rx="7" fill="var(--sunk)" stroke="var(--line)"></rect>
+          <text x="56" y="51" text-anchor="middle" fill="var(--muted)">client</text>
+          <rect x="170" y="24" width="136" height="44" rx="8" fill="var(--signal-soft)" stroke="var(--signal)"></rect>
+          <text x="238" y="42" text-anchor="middle" fill="var(--signal)">capture proxy</text>
+          <text x="238" y="58" text-anchor="middle" fill="var(--muted)" font-size="10">request / response</text>
+          <rect x="380" y="24" width="136" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"></rect>
+          <text x="448" y="42" text-anchor="middle" fill="var(--text)">demo shop + agent</text>
+          <text x="448" y="58" text-anchor="middle" fill="var(--muted)" font-size="10">its SQL, its outbound calls</text>
+          <rect x="590" y="24" width="150" height="44" rx="8" fill="var(--panel)" stroke="var(--amber)"></rect>
+          <text x="665" y="42" text-anchor="middle" fill="var(--amber)">payment gateway</text>
+          <text x="665" y="58" text-anchor="middle" fill="var(--muted)" font-size="10">its ledger counts charges</text>
+          <rect x="170" y="176" width="300" height="52" rx="8" fill="var(--panel)" stroke="var(--line)"></rect>
+          <text x="320" y="198" text-anchor="middle" fill="var(--text)">one recording</text>
+          <text x="320" y="214" text-anchor="middle" fill="var(--muted)" font-size="10">grouped by correlation id, ordered by clock</text>
+          <text x="553" y="38" text-anchor="middle" fill="var(--dim)" font-size="10">charge</text>
+          <text x="246" y="126" fill="var(--dim)" font-size="10">HTTP events</text>
+          <text x="456" y="112" fill="var(--dim)" font-size="10">SQL + the charge, sent before</text>
+          <text x="456" y="126" fill="var(--dim)" font-size="10">the response leaves</text>
+          <text x="590" y="96" fill="var(--amber)" font-size="10">on replay: answered from</text>
+          <text x="590" y="110" fill="var(--amber)" font-size="10">the recording, never called</text>
         </g>
       </svg>
       <figcaption>
-        The proxy sees HTTP; only the application sees its own queries. The agent flushes
-        them <em>before</em> the response leaves the app, so the proxy can never record a
-        response whose database events have not landed yet — no polling, no sleeping, no
-        lost events. If InfraReplay is down, the flush fails quietly and the app still
-        serves its request.
+        The proxy sees HTTP; only the shop sees its own SQL and its own call to the payment gateway.
+        Its agent sends both to the API before the response leaves, so nothing arrives late. On replay
+        the shop makes the same call — and gets the recorded answer instead of a real charge.
       </figcaption>
     </figure>
   </section>
@@ -656,24 +702,11 @@ DIFFERENT  http.response    status 201 -&gt; 409  body: {'error': 'out_of_stock'
       <h2>Roadmap</h2>
       <span class="eyebrow">v1 → v12</span>
     </div>
-
     <div class="tablewrap">
       <table>
-        <thead>
-          <tr><th>Ver</th><th>Scope</th><th>State</th></tr>
-        </thead>
+        <thead><tr><th>Ver</th><th>Scope</th><th>State</th></tr></thead>
         <tbody>
-          <tr class="shipped"><td class="v">v1</td><td>Full pipeline on synthetic data</td><td><span class="state on">Shipped</span></td></tr>
-          <tr class="shipped"><td class="v">v2</td><td>Real HTTP capture plugin</td><td><span class="state on">Shipped</span></td></tr>
-          <tr class="shipped"><td class="v">v3</td><td>Real SQL capture and correlation</td><td><span class="state on">Shipped</span></td></tr>
-          <tr class="shipped"><td class="v">v4</td><td>Replay against live targets</td><td><span class="state on">Shipped</span></td></tr>
-          <tr class="shipped"><td class="v">v5</td><td>Comparison hardening against real-world noise</td><td><span class="state on">Shipped</span></td></tr>
-          <tr class="shipped"><td class="v">v6</td><td>Demo shop with an intentional concurrency bug</td><td><span class="state on">Shipped</span></td></tr>
-          <tr class="shipped"><td class="v">v7</td><td>CLI completeness, export and import</td><td><span class="state on">Shipped</span></td></tr>
-          <tr><td class="v">v8</td><td>Security hardening — encryption at rest, API keys, audit log</td><td><span class="state">Planned</span></td></tr>
-          <tr><td class="v">v9</td><td>Observability — Prometheus metrics, structured logs</td><td><span class="state">Planned</span></td></tr>
-          <tr><td class="v">v10</td><td>Benchmark suite with published methodology</td><td><span class="state">Planned</span></td></tr>
-          <tr><td class="v">v11</td><td>External service mocking during replay</td><td><span class="state">Planned</span></td></tr>
+          <tr class="shipped"><td class="v">v1</td><td>Full pipeline on synthetic data</td><td><span class="state on">Shipped</span></td></tr><tr class="shipped"><td class="v">v2</td><td>Real HTTP capture</td><td><span class="state on">Shipped</span></td></tr><tr class="shipped"><td class="v">v3</td><td>Real SQL capture and correlation</td><td><span class="state on">Shipped</span></td></tr><tr class="shipped"><td class="v">v4</td><td>Replay against live targets</td><td><span class="state on">Shipped</span></td></tr><tr class="shipped"><td class="v">v5</td><td>Comparison hardening</td><td><span class="state on">Shipped</span></td></tr><tr class="shipped"><td class="v">v6</td><td>Demo shop with a real concurrency bug</td><td><span class="state on">Shipped</span></td></tr><tr class="shipped"><td class="v">v7</td><td>Export and import</td><td><span class="state on">Shipped</span></td></tr><tr class="shipped"><td class="v">v8</td><td>Security — masking, encryption at rest, API keys, audit log</td><td><span class="state on">Shipped</span></td></tr><tr class="shipped"><td class="v">v9</td><td>Observability — Prometheus, JSON logs, Grafana</td><td><span class="state on">Shipped</span></td></tr><tr class="shipped"><td class="v">v10</td><td>Benchmark suite with a published method</td><td><span class="state on">Shipped</span></td></tr><tr class="shipped"><td class="v">v11</td><td>External service mocking — a replay never charges a card twice</td><td><span class="state on">Shipped</span></td></tr>
           <tr><td class="v">v12</td><td>A third-party protocol plugin, installed separately</td><td><span class="state">Planned</span></td></tr>
         </tbody>
       </table>
@@ -683,60 +716,38 @@ DIFFERENT  http.response    status 201 -&gt; 409  body: {'error': 'out_of_stock'
   <section>
     <div class="head">
       <h2>Running the demo</h2>
-      <span class="eyebrow">one container, five minutes</span>
+      <span class="eyebrow">one container, real traffic on boot</span>
     </div>
-
     <div class="steps">
-      <div class="step">
-        <span class="num"></span>
-        <div>
-          <p>Start everything — API, demo shop and dashboard — in one container.</p>
-          <code>docker build -t infrareplay .
-docker run --rm --name infrareplay -p 8000:8000 -p 8080:8080 -p 3000:3000 -p 8081:8081 -v infrareplay-data:/data infrareplay</code>
-          <p style="margin-top:8px">Without Docker, the same three processes: <span class="mono">uvicorn infrareplay.api.app:app --port 8000</span>, <span class="mono">uvicorn examples.demo_shop.app:app --port 3000</span>, <span class="mono">python -m infrareplay.dashboard.app</span>.</p>
-        </div>
-      </div>
-
-      <div class="step">
-        <span class="num"></span>
-        <div>
-          <p>The fixture recordings are seeded on boot. To reseed by hand, or outside Docker:</p>
-          <code>infractl demo seed</code>
-        </div>
-      </div>
-
-      <div class="step">
-        <span class="num"></span>
-        <div>
-          <p>Record real traffic: start the proxy, send a checkout through it, stop. Prefix each with <span class="mono">docker exec -it infrareplay</span> when running in Docker.</p>
-          <code>infractl capture start --listen :8081 --upstream :3000
-curl -X POST localhost:8081/api/v1/checkout -H 'x-demo-user: dana' -H 'authorization: Bearer secret' -d '{...}'
-infractl capture stop &lt;recording-id&gt;</code>
-        </div>
-      </div>
-
-      <div class="step">
-        <span class="num"></span>
-        <div>
-          <p>Open the dashboard at <span class="mono">localhost:8080</span>: the request waterfall, each query expandable, the masked <span class="mono">Authorization</span> header.</p>
-        </div>
-      </div>
-
-      <div class="step">
-        <span class="num"></span>
-        <div>
-          <p>Replay it at the live shop, then at a production-looking host to show the refusal.</p>
-          <code>infractl replay &lt;id&gt; --target http://127.0.0.1:3000
-infractl replay &lt;id&gt; --target https://api.production.example.com</code>
-        </div>
-      </div>
-
-      <div class="step">
-        <span class="num"></span>
-        <div>
-          <p>Run the oversell story from <span class="mono">docs/v6.md</span> — capture the race, reproduce it, fix it, replay again.</p>
-        </div>
-      </div>
+      <div class="step"><span class="num"></span><div>
+        <p>Start API, demo shop, payment gateway and dashboard in one container. It records real checkout traffic as it boots.</p>
+        <code>docker build -t infrareplay .
+docker run --rm --name infrareplay -p 8000:8000 -p 8080:8080 -p 3000:3000 -p 4000:4000 -p 8081:8081 infrareplay</code>
+      </div></div>
+      <div class="step"><span class="num"></span><div>
+        <p>Open the dashboard at <span class="mono">localhost:8080</span>, or the terminal UI — either works for the whole demo.</p>
+        <code>docker exec -it infrareplay infractl tui</code>
+      </div></div>
+      <div class="step"><span class="num"></span><div>
+        <p>Record more real traffic: <span class="mono">t</span> in the TUI, the button in the dashboard, or the CLI.</p>
+        <code>docker exec -it infrareplay infractl demo traffic</code>
+      </div></div>
+      <div class="step"><span class="num"></span><div>
+        <p>Replay it against the live shop, and show the gateway's ledger did not move.</p>
+        <code>docker exec -it infrareplay infractl replay &lt;id&gt;
+curl localhost:4000/v1/charges</code>
+      </div></div>
+      <div class="step"><span class="num"></span><div>
+        <p>The bug: replay the race, switch the fix on, replay again, compare.</p>
+        <code>examples/demo_shop/control.sh restock 1
+docker exec -it infrareplay infractl replay &lt;race-id&gt; --concurrency 2
+examples/demo_shop/control.sh fix on &amp;&amp; examples/demo_shop/control.sh restock 1
+docker exec -it infrareplay infractl replay &lt;race-id&gt; --concurrency 2</code>
+      </div></div>
+      <div class="step"><span class="num"></span><div>
+        <p>Show the measured cost of capture: <span class="mono">6</span> in the TUI, or the CLI.</p>
+        <code>docker exec -it infrareplay infractl benchmark show</code>
+      </div></div>
     </div>
   </section>
 
@@ -745,31 +756,21 @@ infractl replay &lt;id&gt; --target https://api.production.example.com</code>
       <h2>What it does not do yet</h2>
       <span class="eyebrow">stated, not hidden</span>
     </div>
-
     <div class="limits">
-      <div class="limit">
-        <p><b>BEGIN and COMMIT are not captured.</b> They are issued on the connection rather than through a cursor, so the SQLAlchemy listener never sees them. Every statement inside the transaction is captured.</p>
-      </div>
-      <div class="limit">
-        <p><b>Result rows are not read back.</b> Reading a cursor would consume it, so results record <span class="mono">rows_affected</span> and whether the statement returned rows.</p>
-      </div>
-      <div class="limit">
-        <p><b>A race only reproduces under concurrency.</b> Replayed one request at a time, the second checkout simply finds the shelf empty — <span class="mono">--concurrency</span> is what makes the recorded race reproducible.</p>
-      </div>
-      <div class="limit">
-        <p><b>No performance claims.</b> The benchmark suite is v10; until it exists, no numbers are published — that rule comes from the spec and it still holds.</p>
-      </div>
-      <div class="limit">
-        <p><b>Security is v8.</b> Recordings are redacted but not encrypted at rest, and the API has no access control yet.</p>
-      </div>
+      <div class="limit"><p><b>One API process is the ceiling under load.</b> Proxy, ingest and writes share it; captured throughput tops out around it at medium and heavy load. More workers would lift it — not built.</p></div>
+      <div class="limit"><p><b>Only HTTP through the instrumented client is stubbed on replay.</b> SMTP, raw sockets, or a library with its own HTTP stack would need their own capture plugin.</p></div>
+      <div class="limit"><p><b>BEGIN and COMMIT are not captured,</b> and query results are recorded as row counts, not rows.</p></div>
+      <div class="limit"><p><b>Encryption covers stored snapshots.</b> Event rows in the database rely on masking, not encryption.</p></div>
+      <div class="limit"><p><b>Benchmarks run on one machine and SQLite.</b> The direct-versus-captured comparison is like for like; absolute numbers are not dedicated-host numbers.</p></div>
     </div>
   </section>
 
   <footer>
     <span>InfraReplay · capture → correlate → store → replay → compare</span>
-    <span>docs/roadmap.md · docs/v1.md … docs/v7.md</span>
+    <span>docs/roadmap.md · docs/v1.md … docs/v11.md · benchmark/</span>
   </footer>
 
 </div>
+
 </body>
 </html>

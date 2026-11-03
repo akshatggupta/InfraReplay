@@ -13,14 +13,15 @@ Built on [Textual](https://textual.textualize.io/). It honours
 
 | Key | Screen | What it shows |
 |---|---|---|
-| `1` | **Overview** | Live tiles from `/metrics` — recordings, events, replays, failures, live captures, auth refusals — two sparklines (events captured and API requests per 2s, with *now* and *peak* in their titles), every comparison so far as one bar split by category, and the most recent audit entries. Refreshes every 2s. |
-| `2` | **Recordings** | Captures and replays, newest first. `enter` opens one; `s` seeds the demo fixtures. |
-| | → **Timeline** | The request waterfall: one row per event, indented under its parent, with a bar showing where it sat in the request and how long it took. The inspector on the right follows the cursor — SQL with its parameters, request headers and body, or the raw payload. `r` replays, `e` exports a bundle to the current directory, `c` jumps to the comparison of a replay. |
-| | → **Replay dialog** | Target (`mock` or a live URL), concurrency (above 1 reproduces races), and whether production-looking targets are allowed. A refused replay is a notification, not a crash. |
+| `1` | **Overview** | Live tiles from `/metrics` — recordings, events, replays, failures, live captures, auth refusals, events dropped (should read 0) — two sparklines (events captured and API requests per 2s, with *now* and *peak* in their titles), every comparison so far as one bar split by category, and the most recent audit entries. Refreshes every 2s. |
+| `2` | **Recordings** | Captures and replays, newest first. `enter` opens one. `t` records **real** traffic — three checkouts, one card declined — through a live capture of the shop; `o` records the oversell race (one unit, two shoppers at once). No fixtures. |
+| | → **Timeline** | The request waterfall: one row per event, indented under its parent, with a bar showing where it sat in the request and how long it took. The shop's calls to the payment gateway show in amber with ↗; on a replay they read "from the recording". The inspector on the right follows the cursor — SQL with its parameters, request headers and body, or the raw payload. `r` replays, `e` exports a bundle to the current directory, `c` jumps to the comparison of a replay. |
+| | → **Replay dialog** | Target (the live shop unless changed), concurrency (above 1 reproduces races), whether production-looking targets are allowed, and whether the target's outbound calls really go out — off by default, so they are answered from the recording and no card is charged twice. A refused replay is a notification, not a crash. |
 | | → **Comparison** | The verdict, counts per category, and every compared pair with the differences listed first. The inspector names the exact fields that changed — `rows[0].state  "declined" → "authorized"` — then shows both sides. `o` opens the original recording. |
 | `3` | **Captures** | Start a capture proxy (upstream, listen port, title); live sessions update every 2s. `x` stops the selected one and opens what it recorded. |
 | `4` | **Audit** | The audit log, live, with outcomes coloured — failed and denied entries stand out. |
 | `5` | **Plugins** | Everything the registry loaded, by slot. |
+| `6` | **Benchmarks** | The latest `benchmark/run.sh` report: what capture costs per load level — throughput, latency added, completeness, events dropped — and the raw runs. |
 
 `r` refreshes, `q` quits, `ctrl+p` opens Textual's command palette.
 
@@ -42,4 +43,7 @@ Built on [Textual](https://textual.textualize.io/). It honours
 `tests/integration/test_tui.py` drives the real app headlessly with
 Textual's Pilot against a live API: tiles following new work, the full
 recording → replay → comparison path, a refused replay, starting and
-stopping a capture from the form, an unreachable API, and API keys.
+stopping a capture from the form, the Benchmarks tab, an unreachable API, and API keys. The
+end-to-end test presses `t` to record real traffic, opens it, replays it against the live
+shop and expects a match. Waits are on conditions (a row appears, a screen opens), not
+fixed delays, so a slow machine is not a failing test.

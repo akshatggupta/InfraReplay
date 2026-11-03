@@ -1,50 +1,139 @@
 # InfraReplay
 
-Record a real HTTP + PostgreSQL workflow, store it as a portable
-recording, replay it elsewhere, and get an automatic diff.
+Record a real HTTP + PostgreSQL workflow — including the calls the app makes
+to other services — store it as a portable recording, replay it elsewhere,
+and get an automatic diff.
 
 **Core loop:** capture → correlate → store → replay → compare.
 
-## Status: v9 of 12 — real capture, real replay, secured and observable
+## Status: v11 of 12 — real traffic, real services, measured
 
-The pipeline runs on **real traffic**, end to end:
+Everything in the demo path is real:
 
-- a reverse proxy records HTTP;
-- SQLAlchemy instrumentation inside the app records the SQL each request
-  triggers, tagged with the same correlation id;
-- replay sends those requests at a live service (one at a time, or
-  concurrently) and records what really comes back — including the SQL the
-  target ran;
-- the comparison normalises away fresh ids and clocks, so what it reports
-  is a real difference;
-- secrets are masked before anything is stored, blob snapshots can be
-  encrypted at rest, the API can require keys, and every capture and replay
-  is audited (v8);
-- Prometheus metrics, JSON logs and a ready-made Grafana dashboard show what
-  it is doing (v9).
+- a reverse proxy records the HTTP the client sends;
+- the app's agent records every SQL statement each request runs, and every
+  call it makes to the **payment-gateway service** — all under one
+  correlation id;
+- replay re-sends the requests to a live shop (one at a time, or concurrently
+  to reproduce a race), records what really comes back, and **answers the
+  shop's payment calls from the recording**, so a replay never charges a card
+  twice — the gateway's own ledger proves it (v11);
+- the comparison normalises away fresh ids and clocks and names the exact
+  field that changed;
+- secrets are masked before anything is stored, snapshots can be encrypted at
+  rest, the API can require keys, every action is audited (v8);
+- Prometheus metrics, JSON logs and a Grafana dashboard (v9);
+- what capture costs under load is **measured and published** (v10).
 
-And there is a **terminal UI** over all of it: `infractl tui`.
+The demo records **real traffic**, not fixtures: `infractl demo traffic`,
+`t` in the TUI, the dashboard's button, and the Docker boot all drive real
+checkouts through a real capture. (`MockCapturePlugin` and the `mock` replay
+target remain for unit tests and offline use only.) What is done and what is
+not: `docs/roadmap.md`.
 
-`MockCapturePlugin` is still there and still used by `infractl demo seed`,
-the unit tests and CI — it is how the whole thing was proved before any
-real capture code existed. See `docs/roadmap.md` for what is done and what
-is not.
+## Run it — Docker, one command
 
-## Quick start (local, no Docker)
+```bash
+docker build -t infrareplay . && docker run --rm --name infrareplay \
+  -p 8000:8000 -p 8080:8080 -p 3000:3000 -p 4000:4000 -p 8081:8081 \
+  -v infrareplay-data:/data infrareplay
+```
+
+On boot it records two real sessions — ordinary checkout traffic and the
+oversell race — so the dashboard and TUI open on real recordings.
+
+| Port | What |
+|---|---|
+| 8080 | web dashboard |
+| 8000 | API (`/docs` for OpenAPI, `/metrics` for Prometheus) |
+| 3000 | demo shop — the app being recorded |
+| 4000 | payment gateway — the shop's external service; ledger at `/v1/charges` |
+| 8081 | where `infractl capture start --listen :8081` listens |
+
+The terminal UI and CLI run inside the container:
+
+```bash
+docker exec -it infrareplay infractl tui
+docker exec -it infrareplay infractl demo traffic
+```
+
+## Run it — locally
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-pip install -e ".[test]"
+pip install -e ".[test,benchmark]"
 
-# terminal 1 — API
-uvicorn infrareplay.api.app:app --port 8000
-
-# terminal 2 — the app to record
-uvicorn examples.demo_shop.app:app --port 3000
-
-# terminal 3 — dashboard
-python -m infrareplay.dashboard.app        # http://127.0.0.1:8080
+uvicorn infrareplay.api.app:app --port 8000               # terminal 1 — API
+uvicorn examples.payment_gateway.app:app --port 4000      # terminal 2 — payment gateway
+uvicorn examples.demo_shop.app:app --port 3000            # terminal 3 — the shop
+python -m infrareplay.dashboard.app                       # terminal 4 — dashboard :8080
+infractl tui                                              # or the terminal UI
 ```
+
+## The demo — a real run, unedited
+
+```
+$ infractl demo traffic
+rec_96b813950177  [completed]  Checkout — live traffic
+  62 events · responses 201, 201, 402 · 3 payment-gateway calls
+
+$ examples/demo_shop/control.sh ledger   # the payment gateway's own count
+charges: 3
+
+$ infractl replay rec_96b813950177
+replay rpl_0ee03e95723b against http://127.0.0.1:3000
+summary: {'MATCH': 31, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
+
+$ examples/demo_shop/control.sh ledger
+charges: 3   <- unchanged: the replay charged nobody
+```
+
+The bug the demo shop is built around — one unit in stock, two shoppers at
+once — recorded, reproduced, fixed with a feature flag, and shown fixed:
+
+```
+$ infractl demo race
+rec_f222456c3278  [completed]  Checkout — oversell race
+  36 events · responses 201, 201 · 2 payment-gateway calls      # one unit, sold twice
+
+$ examples/demo_shop/control.sh restock 1
+$ infractl replay rec_f222456c3278 --concurrency 2
+summary: {'MATCH': 18, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}   # reproduced
+
+$ examples/demo_shop/control.sh fix on
+$ examples/demo_shop/control.sh restock 1
+$ infractl replay rec_f222456c3278 --concurrency 2
+summary: {'MATCH': 13, 'DIFFERENT': 2, 'MISSING': 3, 'NEW': 0, 'ERROR': 0}
+
+$ infractl compare rpl_ddc11016ef9f | grep -v ^MATCH
+DIFFERENT  postgres.result  {'rows_affected': {'original': 1, 'replayed': 0}}
+DIFFERENT  http.response    {'status': {'original': 200, 'replayed': 409}, ...}
+MISSING    postgres.result
+MISSING    postgres.result
+MISSING    http.response
+```
+
+With the fix, the reserving `UPDATE` changes no row, the second shopper gets a
+409 instead of a charge, and the payment call and its SQL never happen —
+which is exactly what the MISSING rows say. The full run, including the
+production-target refusal, the benchmark and the audit log:
+`docs/demo-transcript.txt`.
+
+## What capture costs — measured (v10)
+
+`benchmark/run.sh` — same workload, direct and through capture, 30 s per run:
+
+| Load | Throughput | Median checkout added | Complete requests | Events dropped |
+|---|---:|---:|---:|---:|
+| light, 5 users | −12.3% | +33 ms | 100% | 0 |
+| medium, 20 users | −24.0% | +150 ms | 100% | 0 |
+| heavy, 50 users | −45.7% | +950 ms | 100% | 0 |
+
+The first run found capture unusable under load (−90% to −95% throughput,
+and lost events): an HTTP client was built for every request (183 ms each),
+and SQLite locks dropped writes. Both are fixed; the story, with every run
+kept: `docs/v10.md`. Report and method: `benchmark/results/latest/report.md`.
+No performance figure appears in this project without that report behind it.
 
 ## Terminal UI
 
@@ -52,221 +141,81 @@ python -m infrareplay.dashboard.app        # http://127.0.0.1:8080
 infractl tui
 ```
 
-Live metric tiles and sparklines, recordings with their request waterfall,
-replay from a dialog, comparisons that name the exact field that changed,
-live capture start/stop, and the audit log — all keyboard-driven. Keys and
-screens: `docs/tui.md`.
+`1`–`6`: overview (live metric tiles and sparklines), recordings, captures,
+audit log, plugins, benchmarks. `t` records live traffic, `o` the oversell
+race, `enter` opens a recording's request waterfall, `r` replays it, and the
+comparison names the exact field that changed. `docs/tui.md`.
 
-## Quick start (Docker — one command)
-
-Backend, demo shop and dashboard in a single container, seeded on boot:
+## Docker Compose — separate services, Postgres, Grafana
 
 ```bash
-docker build -t infrareplay . && docker run --rm --name infrareplay \
-  -p 8000:8000 -p 8080:8080 -p 3000:3000 -p 8081:8081 \
-  -v infrareplay-data:/data infrareplay
+docker compose up --build                                 # API, shop, gateway, dashboard, Postgres
+docker compose --profile observability up --build         # + Prometheus :9090, Grafana :3001
 ```
 
-Then open **http://localhost:8080**.
-
-| Port | What |
-|---|---|
-| 8080 | dashboard — the frontend |
-| 8000 | API (`/docs` for OpenAPI) |
-| 3000 | demo shop, the app being recorded |
-| 8081 | where `infractl capture start --listen :8081` listens |
-
-Recordings live in the `infrareplay-data` volume, so they survive a
-restart. Drive the CLI inside the running container:
+Containers reach each other by service name, so the shop is
+`http://shop:3000`:
 
 ```bash
-docker exec -it infrareplay infractl recordings list
-docker exec -it infrareplay infractl capture start --listen :8081 --upstream :3000
-docker exec -it infrareplay infractl replay <recording-id> --target http://127.0.0.1:3000
-```
-
-Stop it with `Ctrl-C`, or `docker stop infrareplay` from another terminal.
-
-## Quick start (Docker Compose — separate services + Postgres)
-
-```bash
-docker compose up --build
-```
-
-Same ports on the host, but each service is its own container and the
-metadata store is Postgres instead of SQLite. `INFRAREPLAY_ROLE`
-(`api` · `shop` · `dashboard` · `all`) selects a role from the one image,
-and the fixture recordings are seeded by a one-shot `seed` service.
-
-Containers reach each other by service name, so here the upstream and the
-replay target are `http://shop:3000`, not `:3000`:
-
-```bash
-docker compose exec api infractl capture start --listen :8081 --upstream http://shop:3000
-# send the checkout to localhost:8081, then:
-docker compose exec api infractl capture stop <recording-id>
 docker compose exec api infractl replay <recording-id> --target http://shop:3000
 ```
-
-To demo the inventory fix, restart the shop with the flag set:
-
-```bash
-DEMO_SHOP_LOCK_INVENTORY=1 docker compose up -d --force-recreate shop
-```
-
-Postgres is deliberately not published to the host — it would collide
-with any Postgres already running there. Tear the stack down with
-`docker compose down -v`.
-
-## Observability (v9)
-
-```bash
-docker compose --profile observability up --build
-```
-
-Adds Prometheus (http://localhost:9090) scraping `/metrics` every 5s and
-Grafana (http://localhost:3001) opening straight onto the InfraReplay
-dashboard. The dashboard file, `docs/grafana/infrareplay-dashboard.json`,
-also imports by hand into any Grafana. Logs are one JSON object per line;
-`INFRAREPLAY_LOG_FORMAT=console` for humans.
 
 ## Security (v8)
 
 ```bash
 export INFRAREPLAY_API_KEYS="ci:$(openssl rand -hex 16)"   # server: require keys
 export INFRAREPLAY_API_KEY="<that secret>"                  # clients: send one
-
-export INFRAREPLAY_STORAGE_PLUGIN=storage_encrypted          # encrypt blobs at rest
+export INFRAREPLAY_STORAGE_PLUGIN=storage_encrypted          # encrypt snapshots at rest
 export INFRAREPLAY_ENCRYPTION_KEY="$(infractl security keygen)"
 ```
 
 With no keys set the API is open — the dev default — and `/health` says so.
-`infractl audit list` shows who captured, replayed, exported or imported
-what, and every refused call. Details and limits: `docs/v8.md`.
-
-## Demo transcript
-
-Synthetic first — no infrastructure needed:
-
-```
-$ infractl demo seed
-rec_3ad6c830a44a  Checkout — clean run
-rec_836f26303bbd  Checkout — payment step fails
-
-$ infractl replay rec_836f26303bbd --target mock
-summary: {'MATCH': 4, 'DIFFERENT': 2, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
-```
-
-Then the real thing:
-
-```
-$ infractl capture start --listen :8081 --upstream :3000
-rec_71bdd9bf3688  listening :8081 -> http://127.0.0.1:3000
-
-$ curl -X POST localhost:8081/api/v1/checkout -H 'x-demo-user: dana' \
-       -H 'authorization: Bearer secret-token' -d '{...}'
-
-$ infractl capture stop rec_71bdd9bf3688
-rec_71bdd9bf3688  [completed]  16 events
-
- 0 http.request     POST /api/v1/checkout        authorization: ***REDACTED***
- 1 postgres.query   SELECT users...
- 3 postgres.query   SELECT inventory...
- 5 postgres.query   INSERT INTO orders...
- 7 postgres.query   INSERT INTO order_items...
- 9 postgres.query   UPDATE inventory...
-11 postgres.query   INSERT INTO payments...
-13 postgres.query   UPDATE orders SET status...
-15 http.response    201
-
-$ infractl replay rec_71bdd9bf3688 --target http://127.0.0.1:3000
-summary: {'MATCH': 8, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
-
-$ infractl replay rec_71bdd9bf3688 --target https://api.production.example.com
-error 400: target looks like production; pass unsafe to override
-```
-
-And the bug the demo shop is built around — one unit in stock, two
-shoppers at once, replayed against the buggy app and then the fixed one:
-
-```
-$ infractl replay rec_3856638fb164 --target http://127.0.0.1:3000 --concurrency 2
-summary: {'MATCH': 16, 'DIFFERENT': 0, ...}          # bug reproduced
-
-$ DEMO_SHOP_LOCK_INVENTORY=1 ...restart the shop...
-$ infractl replay rec_3856638fb164 --target http://127.0.0.1:3000 --concurrency 2
-summary: {'MATCH': 12, 'DIFFERENT': 2, 'MISSING': 2, ...}
-
-DIFFERENT  postgres.result  rows_affected 1 -> 0
-DIFFERENT  http.response    status 201 -> 409   body: {'error': 'out_of_stock'}
-```
-
-Full walkthrough: `docs/v6.md`.
-
-In the dashboard: recordings list → click a recording → request-scoped
-waterfall (nested HTTP→DB events with duration bars, expand any event for
-its SQL / headers / body) → **Replay** (mock or a live URL) →
-captured-vs-replayed comparison with per-field diffs. **Captures** starts
-and stops a live proxy from the browser.
 
 ## CLI
 
 | Command | Purpose |
 |---|---|
-| `infractl demo seed` | create the clean + buggy fixture recordings |
-| `infractl capture start --listen :8081 --upstream :3000` | start a live capture proxy |
-| `infractl capture list` / `stop <id>` | show / finalise live captures |
-| `infractl recordings list [--kind capture\|replay]` | list recordings |
-| `infractl recordings show <id>` | full recording as JSON |
-| `infractl recordings export <id> -o f.json` | portable bundle |
-| `infractl recordings validate f.json` | check a bundle without importing |
-| `infractl recordings import f.json` | load a bundle into this instance |
-| `infractl replay <id> --target mock\|<url>` | replay + compare |
-| `infractl replay <id> --concurrency N --sub old=new --auto-subs` | reproduce races, swap dynamic values |
-| `infractl compare <replay-id>` | show a replay's comparison |
-| `infractl projects list` | recordings per project |
-| `infractl plugins list` | registered plugins |
+| `infractl demo traffic` | record real checkouts through a live capture of the shop |
+| `infractl demo race` | record the oversell race (stock 1, two shoppers at once) |
+| `infractl capture start --listen :8081 --upstream :3000` / `stop <id>` | a live capture proxy |
+| `infractl recordings list` / `show <id>` | recordings |
+| `infractl replay <id>` | replay against the live shop and compare |
+| `infractl replay <id> --concurrency N` | reproduce a race |
+| `infractl replay <id> --externals live` | really call the shop's external services (off by default) |
+| `infractl compare <replay-id>` | a replay's comparison |
+| `infractl benchmark show` | the latest benchmark report |
+| `infractl audit list` | who captured, replayed, exported or imported what |
+| `infractl recordings export` / `import` / `validate` | portable bundles |
 | `infractl tui` | the terminal UI |
-| `infractl audit list [--action replay.run] [--recording <id>]` | the audit log |
-| `infractl security keygen` | a fresh key for encryption at rest |
+| `infractl security keygen` | a key for encryption at rest |
+| `infractl demo seed` | two **synthetic** fixtures, for tests and offline use |
+
+`examples/demo_shop/control.sh restock N | fix on|off | orders | ledger` drives
+the shop and its gateway during a demo.
 
 ## Tests
 
 ```bash
-pytest
+pytest                 # 71 tests; one skips unless a stack is running
+benchmark/run.sh       # the load benchmark, ~7 minutes — run nothing else meanwhile
 ```
 
-58 tests (one skips unless a stack is running). The integration suite
-starts a real API, a real demo shop and a real capture proxy on real ports —
-nothing about capture, replay or comparison is stubbed there — and drives
-the TUI headlessly against a live API.
+The integration tests start a real API, demo shop, payment gateway and
+capture proxy on real ports, and drive the TUI headlessly against them.
 
 ## Layout
 
 ```
 infrareplay/
-  schema/       Pydantic Event / Recording / ReplayRun / ComparisonResult
-  contracts/    ABCs: capture, storage, redaction, comparator
-  plugins/      registry + built-ins (mock_capture, http_capture,
-                postgres_capture, storage_fs, storage_encrypted,
-                redaction_default, http/postgres comparators)
-  capture/      live sessions, correlation context, ingest
-  agent/        app-side instrumentation (middleware + ingest client)
-  security/     API keys, audit log, encryption keys
-  observability/ Prometheus metrics, structlog JSON logs
-  db/           async SQLAlchemy metadata store
-  recording/    lifecycle, correlation, export/import
-  replay/       engine, live HTTP target, substitution, linking
-  comparison/   pair-walk engine + normalisation
-  api/          FastAPI
-  cli/          Typer (infractl)
-  dashboard/    NiceGUI
-  tui/          Textual (infractl tui)
-examples/demo_shop/   the recorded application, with its bug
-docs/grafana/         dashboard + Prometheus/Grafana provisioning
-migrations/           Alembic
+  schema/  contracts/  plugins/     the event schema, plugin ABCs, built-in plugins
+  capture/  agent/                  live capture, the in-app agent, outbound capture (egress.py)
+  recording/  replay/  comparison/  lifecycle, replay engine, diffing
+  security/  observability/         v8 and v9
+  api/  cli/  dashboard/  tui/      one API, three clients
+examples/demo_shop/                 the recorded application, with its bug
+examples/payment_gateway/           the external service the shop pays through
+benchmark/                          v10: run.sh, the Locust workload, reports
+docs/                               v1.md … v11.md, roadmap, status page, Grafana
 ```
 
-See `architecture.md` for the system design, `docs/roadmap.md` for build
-state, `docs/v1.md` … `docs/v9.md` for what each version added, and
-`docs/tui.md` for the terminal UI.
+`architecture.md` has the system design; `remember-docs/` the handoff notes.
