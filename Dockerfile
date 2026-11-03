@@ -13,9 +13,10 @@ COPY infrareplay ./infrareplay
 COPY examples ./examples
 COPY migrations ./migrations
 COPY docker ./docker
+COPY benchmark ./benchmark
 COPY alembic.ini ./
 
-RUN pip install -e ".[test]" \
+RUN pip install -e ".[test,benchmark]" \
  && chmod +x docker/entrypoint.sh \
  && mkdir -p /data/blobs
 
@@ -30,8 +31,8 @@ ENV INFRAREPLAY_DATABASE_URL="sqlite+aiosqlite:////data/infrareplay.db" \
 
 VOLUME ["/data"]
 
-# 8000 API · 8080 dashboard · 3000 demo shop · 8081 capture proxy
-EXPOSE 8000 8080 3000 8081
+# 8000 API · 8080 dashboard · 3000 demo shop · 4000 payment gateway · 8081 capture proxy
+EXPOSE 8000 8080 3000 4000 8081
 
 # NiceGUI takes ~20s to come up; the grace period covers that.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=45s --retries=5 \

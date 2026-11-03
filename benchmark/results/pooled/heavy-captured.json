@@ -1,0 +1,32 @@
+{
+  "elapsed_s": 33.94,
+  "rows": {
+    "Aggregated": {
+      "requests": 885,
+      "failures": 0,
+      "rps": 26.08,
+      "avg_ms": 1757.3,
+      "p50_ms": 1300.0,
+      "p95_ms": 4500.0,
+      "p99_ms": 7000.0
+    },
+    "POST /api/v1/checkout": {
+      "requests": 677,
+      "failures": 0,
+      "rps": 19.95,
+      "avg_ms": 1932.6,
+      "p50_ms": 1400.0,
+      "p95_ms": 4800.0,
+      "p99_ms": 7500.0
+    },
+    "GET /api/v1/inventory": {
+      "requests": 208,
+      "failures": 0,
+      "rps": 6.13,
+      "avg_ms": 1186.7,
+      "p50_ms": 1000.0,
+      "p95_ms": 1900.0,
+      "p99_ms": 4000.0
+    }
+  }
+}

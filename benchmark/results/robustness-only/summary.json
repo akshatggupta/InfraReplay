@@ -1,0 +1,356 @@
+{
+  "started_at": "2026-11-02T19:14:12+00:00",
+  "machine": {
+    "cpu": "12th Gen Intel(R) Core(TM) i5-12500H",
+    "logical_cores": 16,
+    "ram_gb": 7.6,
+    "os": "Linux-5.15.167.4-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "packages": {
+      "locust": "2.47.0",
+      "uvicorn": "0.52.4",
+      "fastapi": "0.141.1",
+      "starlette": "1.6.0",
+      "sqlalchemy": "2.0.52",
+      "aiosqlite": "0.22.1",
+      "httpx": "0.28.1"
+    }
+  },
+  "backend": {
+    "api_db": "sqlite",
+    "shop_db": "sqlite"
+  },
+  "warmup_s": 5,
+  "levels": [
+    {
+      "level": "light",
+      "users": 5,
+      "seconds": 30,
+      "direct": {
+        "stats": {
+          "Aggregated": {
+            "requests": 744,
+            "failures": 0,
+            "rps": 21.8,
+            "avg_ms": 95.3,
+            "p50_ms": 49.0,
+            "p95_ms": 240.0,
+            "p99_ms": 750.0
+          },
+          "POST /api/v1/checkout": {
+            "requests": 568,
+            "failures": 0,
+            "rps": 16.64,
+            "avg_ms": 118.8,
+            "p50_ms": 62.0,
+            "p95_ms": 270.0,
+            "p99_ms": 800.0
+          },
+          "GET /api/v1/inventory": {
+            "requests": 176,
+            "failures": 0,
+            "rps": 5.16,
+            "avg_ms": 19.5,
+            "p50_ms": 11.0,
+            "p95_ms": 62.0,
+            "p99_ms": 110.0
+          }
+        },
+        "elapsed_s": 34.13,
+        "processes": {
+          "api": {
+            "cpu_mean_pct": 0.3,
+            "cpu_peak_pct": 2.0,
+            "rss_peak_mb": 87.6
+          },
+          "shop": {
+            "cpu_mean_pct": 18.1,
+            "cpu_peak_pct": 53.9,
+            "rss_peak_mb": 89.3
+          }
+        }
+      },
+      "captured": {
+        "stats": {
+          "Aggregated": {
+            "requests": 79,
+            "failures": 0,
+            "rps": 2.3,
+            "avg_ms": 2045.8,
+            "p50_ms": 1800.0,
+            "p95_ms": 4700.0,
+            "p99_ms": 6400.0
+          },
+          "GET /api/v1/inventory": {
+            "requests": 24,
+            "failures": 0,
+            "rps": 0.7,
+            "avg_ms": 1738.4,
+            "p50_ms": 1600.0,
+            "p95_ms": 2300.0,
+            "p99_ms": 5300.0
+          },
+          "POST /api/v1/checkout": {
+            "requests": 55,
+            "failures": 0,
+            "rps": 1.6,
+            "avg_ms": 2179.9,
+            "p50_ms": 1900.0,
+            "p95_ms": 4700.0,
+            "p99_ms": 6400.0
+          }
+        },
+        "elapsed_s": 34.31,
+        "processes": {
+          "api": {
+            "cpu_mean_pct": 15.3,
+            "cpu_peak_pct": 45.7,
+            "rss_peak_mb": 105.9
+          },
+          "shop": {
+            "cpu_mean_pct": 13.4,
+            "cpu_peak_pct": 43.9,
+            "rss_peak_mb": 96.0
+          }
+        },
+        "capture": {
+          "recording_id": "rec_33d13ee76a77",
+          "events_captured": 976,
+          "events_expected": 976,
+          "completeness_pct": 100.0,
+          "events_per_s": 28.4,
+          "stored_bytes": 658429,
+          "stored_bytes_per_s": 19191,
+          "finalise_s": 1.91
+        }
+      },
+      "overhead": {
+        "throughput_change_pct": -89.4,
+        "checkout_p50_added_ms": 1838.0,
+        "checkout_p95_added_ms": 4430.0,
+        "checkout_p99_added_ms": 5600.0
+      }
+    },
+    {
+      "level": "medium",
+      "users": 20,
+      "seconds": 30,
+      "direct": {
+        "stats": {
+          "Aggregated": {
+            "requests": 1705,
+            "failures": 0,
+            "rps": 50.31,
+            "avg_ms": 249.7,
+            "p50_ms": 63.0,
+            "p95_ms": 1200.0,
+            "p99_ms": 3500.0
+          },
+          "GET /api/v1/inventory": {
+            "requests": 436,
+            "failures": 0,
+            "rps": 12.86,
+            "avg_ms": 18.7,
+            "p50_ms": 13.0,
+            "p95_ms": 53.0,
+            "p99_ms": 120.0
+          },
+          "POST /api/v1/checkout": {
+            "requests": 1269,
+            "failures": 0,
+            "rps": 37.44,
+            "avg_ms": 329.0,
+            "p50_ms": 95.0,
+            "p95_ms": 1500.0,
+            "p99_ms": 4100.0
+          }
+        },
+        "elapsed_s": 33.89,
+        "processes": {
+          "api": {
+            "cpu_mean_pct": 0.2,
+            "cpu_peak_pct": 2.0,
+            "rss_peak_mb": 112.1
+          },
+          "shop": {
+            "cpu_mean_pct": 39.5,
+            "cpu_peak_pct": 87.7,
+            "rss_peak_mb": 101.7
+          }
+        }
+      },
+      "captured": {
+        "stats": {
+          "Aggregated": {
+            "requests": 97,
+            "failures": 0,
+            "rps": 2.79,
+            "avg_ms": 6850.7,
+            "p50_ms": 6500.0,
+            "p95_ms": 11000.0,
+            "p99_ms": 13000.0
+          },
+          "GET /api/v1/inventory": {
+            "requests": 25,
+            "failures": 0,
+            "rps": 0.72,
+            "avg_ms": 5963.8,
+            "p50_ms": 5800.0,
+            "p95_ms": 9100.0,
+            "p99_ms": 11000.0
+          },
+          "POST /api/v1/checkout": {
+            "requests": 72,
+            "failures": 0,
+            "rps": 2.07,
+            "avg_ms": 7158.6,
+            "p50_ms": 6500.0,
+            "p95_ms": 11000.0,
+            "p99_ms": 13000.0
+          }
+        },
+        "elapsed_s": 34.75,
+        "processes": {
+          "api": {
+            "cpu_mean_pct": 20.3,
+            "cpu_peak_pct": 123.7,
+            "rss_peak_mb": 135.5
+          },
+          "shop": {
+            "cpu_mean_pct": 16.0,
+            "cpu_peak_pct": 49.7,
+            "rss_peak_mb": 110.8
+          }
+        },
+        "capture": {
+          "recording_id": "rec_e87369e1d577",
+          "events_captured": 1300,
+          "events_expected": 1252,
+          "completeness_pct": 103.83,
+          "events_per_s": 37.4,
+          "stored_bytes": 875688,
+          "stored_bytes_per_s": 25200,
+          "finalise_s": 3.7
+        }
+      },
+      "overhead": {
+        "throughput_change_pct": -94.5,
+        "checkout_p50_added_ms": 6405.0,
+        "checkout_p95_added_ms": 9500.0,
+        "checkout_p99_added_ms": 8900.0
+      }
+    },
+    {
+      "level": "heavy",
+      "users": 50,
+      "seconds": 30,
+      "direct": {
+        "stats": {
+          "Aggregated": {
+            "requests": 1563,
+            "failures": 0,
+            "rps": 44.65,
+            "avg_ms": 977.7,
+            "p50_ms": 650.0,
+            "p95_ms": 2700.0,
+            "p99_ms": 5700.0
+          },
+          "GET /api/v1/inventory": {
+            "requests": 418,
+            "failures": 0,
+            "rps": 11.94,
+            "avg_ms": 682.5,
+            "p50_ms": 570.0,
+            "p95_ms": 950.0,
+            "p99_ms": 5400.0
+          },
+          "POST /api/v1/checkout": {
+            "requests": 1145,
+            "failures": 0,
+            "rps": 32.71,
+            "avg_ms": 1085.5,
+            "p50_ms": 680.0,
+            "p95_ms": 3200.0,
+            "p99_ms": 6200.0
+          }
+        },
+        "elapsed_s": 35.01,
+        "processes": {
+          "api": {
+            "cpu_mean_pct": 0.3,
+            "cpu_peak_pct": 2.0,
+            "rss_peak_mb": 136.9
+          },
+          "shop": {
+            "cpu_mean_pct": 40.7,
+            "cpu_peak_pct": 81.7,
+            "rss_peak_mb": 111.7
+          }
+        }
+      },
+      "captured": {
+        "stats": {
+          "Aggregated": {
+            "requests": 94,
+            "failures": 0,
+            "rps": 2.78,
+            "avg_ms": 17526.8,
+            "p50_ms": 18000.0,
+            "p95_ms": 29000.0,
+            "p99_ms": 34000.0
+          },
+          "GET /api/v1/inventory": {
+            "requests": 25,
+            "failures": 0,
+            "rps": 0.74,
+            "avg_ms": 16354.2,
+            "p50_ms": 16000.0,
+            "p95_ms": 27000.0,
+            "p99_ms": 27000.0
+          },
+          "POST /api/v1/checkout": {
+            "requests": 69,
+            "failures": 0,
+            "rps": 2.04,
+            "avg_ms": 17951.7,
+            "p50_ms": 18000.0,
+            "p95_ms": 29000.0,
+            "p99_ms": 34000.0
+          }
+        },
+        "elapsed_s": 33.86,
+        "processes": {
+          "api": {
+            "cpu_mean_pct": 22.1,
+            "cpu_peak_pct": 141.8,
+            "rss_peak_mb": 176.1
+          },
+          "shop": {
+            "cpu_mean_pct": 16.7,
+            "cpu_peak_pct": 50.0,
+            "rss_peak_mb": 122.9
+          }
+        },
+        "capture": {
+          "recording_id": "rec_fe4a97ad45da",
+          "events_captured": 1284,
+          "events_expected": 1204,
+          "completeness_pct": 106.64,
+          "events_per_s": 37.9,
+          "stored_bytes": 865078,
+          "stored_bytes_per_s": 25549,
+          "finalise_s": 4.25
+        }
+      },
+      "overhead": {
+        "throughput_change_pct": -93.8,
+        "checkout_p50_added_ms": 17320.0,
+        "checkout_p95_added_ms": 25800.0,
+        "checkout_p99_added_ms": 27800.0
+      }
+    }
+  ],
+  "events_per_checkout": 16,
+  "events_per_browse": 4,
+  "finished_at": "2026-11-02T19:20:28+00:00"
+}

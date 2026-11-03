@@ -26,6 +26,8 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-asyncio"]
+# v10: benchmark/run.sh — Locust drives the load, psutil samples CPU and memory.
+benchmark = ["locust", "psutil"]
 
 [project.scripts]
 infractl = "infrareplay.cli.main:app"

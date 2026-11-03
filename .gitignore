@@ -10,3 +10,8 @@ dist/
 .data/
 data/
 .env
+
+# Benchmark: commit the published report and the named evidence runs, not
+# timestamped scratch runs or raw service logs.
+benchmark/results/2*/
+benchmark/results/*/logs/
