@@ -12,10 +12,12 @@ _CONFLICT = 409
 
 
 def _statuses(recording: dict) -> list[int]:
+    """What the client got back — not the shop's own calls to its gateway."""
+
     return [
         e["payload"].get("status")
         for e in recording["events"]
-        if e["event_type"] == "http.response"
+        if e["event_type"] == "http.response" and e["payload"].get("direction") != "outbound"
     ]
 
 
@@ -40,6 +42,9 @@ async def test_replay_against_live_target_captures_its_sql(stack):
     # ran, streamed back by the agent while the replay was in flight.
     types = {e["event_type"] for e in run["events"]}
     assert types == {"http.request", "http.response", "postgres.query", "postgres.result"}
+
+    # The shop's payment call was answered from the recording, not sent.
+    assert any(e["payload"].get("stubbed") for e in run["events"])
     assert _statuses(run) == [_CONFIRMED]
 
 

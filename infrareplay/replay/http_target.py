@@ -21,6 +21,12 @@ from infrareplay.schema import Event, EventType
 RECORDING_HEADER = "x-infrareplay-recording-id"
 CORRELATION_HEADER = "x-infrareplay-correlation-id"
 
+# v11: which original request a replayed request reproduces, so the target's
+# outbound calls can be answered from that request's recording.
+REPLAY_OF_HEADER = "x-infrareplay-replay-of"
+SOURCE_CORRELATION_HEADER = "x-infrareplay-source-correlation"
+EXTERNALS_HEADER = "x-infrareplay-externals"
+
 # Describe the captured hop, not the replayed one.
 _DROP_HEADERS = frozenset(
     {"host", "content-length", "connection", "transfer-encoding", "keep-alive"}
@@ -38,10 +44,14 @@ class HttpTarget:
         base_url: str,
         *,
         recording_id: str,
+        source_recording_id: str,
+        externals: str,
         timeout_s: float = _TIMEOUT_S,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._recording_id = recording_id
+        self._source_recording_id = source_recording_id
+        self._externals = externals
         self._service = urlparse(base_url).netloc or base_url
         self._client = httpx.AsyncClient(timeout=timeout_s, follow_redirects=False)
         self._sequence = 0
@@ -52,11 +62,11 @@ class HttpTarget:
     async def __aexit__(self, *_) -> None:
         await self._client.aclose()
 
-    async def send(self, payload: dict) -> list[Event]:
+    async def send(self, payload: dict, source_correlation: str) -> list[Event]:
         """Replay one http.request payload; return the request/response pair."""
 
         correlation_id = f"corr_{uuid4().hex[:12]}"
-        headers = self._headers(payload, correlation_id)
+        headers = self._headers(payload, correlation_id, source_correlation)
 
         request = self._event(
             EventType.HTTP_REQUEST,
@@ -95,7 +105,7 @@ class HttpTarget:
 
     # ---------------------------------------------------------------- helpers
 
-    def _headers(self, payload: dict, correlation_id: str) -> dict:
+    def _headers(self, payload: dict, correlation_id: str, source_correlation: str) -> dict:
         headers = {
             k: v
             for k, v in (payload.get("headers") or {}).items()
@@ -103,6 +113,9 @@ class HttpTarget:
         }
         headers[RECORDING_HEADER] = self._recording_id
         headers[CORRELATION_HEADER] = correlation_id
+        headers[REPLAY_OF_HEADER] = self._source_recording_id
+        headers[SOURCE_CORRELATION_HEADER] = source_correlation
+        headers[EXTERNALS_HEADER] = self._externals
 
         return headers
 

@@ -1,4 +1,5 @@
-"""A live stack: the InfraReplay API and the demo shop, both on real ports."""
+"""A live stack: the InfraReplay API, the demo shop and its payment gateway,
+each on a real port."""
 
 import asyncio
 
@@ -24,7 +25,18 @@ _TIMEOUT_S = 30
 
 
 @pytest.fixture
-async def stack(tmp_path, monkeypatch):
+async def gateway(monkeypatch):
+    """The payment gateway the shop charges cards on (v11), with its ledger."""
+
+    from examples.payment_gateway.app import create_app as create_gateway
+
+    async with LiveServer(create_gateway()) as server:
+        monkeypatch.setenv("DEMO_SHOP_PAYMENTS_URL", server.url)
+        yield server
+
+
+@pytest.fixture
+async def stack(tmp_path, monkeypatch, gateway):
     monkeypatch.setenv("DEMO_SHOP_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}/shop.db")
     monkeypatch.setenv("DEMO_SHOP_RACE_WINDOW_S", "0.05")
     monkeypatch.delenv("DEMO_SHOP_LOCK_INVENTORY", raising=False)

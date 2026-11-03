@@ -5,12 +5,20 @@ import httpx
 from infrareplay import config
 from infrareplay.capture import context
 from infrareplay.plugins.registry import get_registry
-from infrareplay.replay.http_target import CORRELATION_HEADER, RECORDING_HEADER
+from infrareplay.agent.egress import CapturingTransport
+from infrareplay.replay.http_target import (
+    CORRELATION_HEADER,
+    EXTERNALS_HEADER,
+    RECORDING_HEADER,
+    REPLAY_OF_HEADER,
+    SOURCE_CORRELATION_HEADER,
+)
 from infrareplay.schema import Event
 from infrareplay.security import API_KEY_HEADER
 
 _SQL_PLUGIN = "postgres_capture"
 _INGEST_PATH = "/api/captures/{rid}/events"
+_EXTERNALS_PATH = "/api/recordings/{rid}/externals"
 _TIMEOUT_S = 10
 
 
@@ -32,13 +40,81 @@ class CaptureAgent:
         self._plugin = get_registry().capture(plugin_name)()
         self._stream = None
 
+        # One pooled client for the agent's life: building one per flush cost
+        # 183 ms median, paid inside every captured request.
+        self._client: httpx.AsyncClient | None = None
+
+        # v11: outbound calls waiting for the next flush, the transport that
+        # records them, and the recorded answers fetched for a replay.
+        self._outbound: list[Event] = []
+        self._transport: CapturingTransport | None = None
+        self._answers: dict[tuple[str, str], list[dict]] = {}
+
+    def http_transport(self) -> CapturingTransport:
+        """The transport to build the app's outbound HTTP client on (v11).
+
+            httpx.AsyncClient(base_url=..., transport=agent.http_transport())
+        """
+
+        if self._transport is None:
+            self._transport = CapturingTransport(
+                record=self._outbound.extend,
+                lookup=self._recorded_calls,
+                service=self._service,
+            )
+
+        return self._transport
+
+    def forget(self, correlation_id: str, replay_of: str | None, source: str | None) -> None:
+        """Drop one request's replay state once it has answered."""
+
+        if self._transport is not None:
+            self._transport.forget(correlation_id)
+
+        if replay_of:
+            self._answers.pop((replay_of, source or ""), None)
+
+    async def _recorded_calls(self, recording_id: str, correlation_id: str) -> list[dict]:
+        """The outbound calls the original request made, fetched once per request."""
+
+        key = (recording_id, correlation_id)
+
+        if key in self._answers:
+            return self._answers[key]
+
+        if self._client is None:
+            return []
+
+        try:
+            reply = await self._client.get(
+                _EXTERNALS_PATH.format(rid=recording_id), params={"correlation_id": correlation_id}
+            )
+            answers = reply.json() if reply.is_success else []
+        except httpx.HTTPError:
+            answers = []  # no answers: the transport fails closed, nothing goes out
+
+        self._answers[key] = answers
+
+        return answers
+
     async def start(self) -> None:
         await self._plugin.start({"engine": self._engine, "service": self._service})
         self._stream = self._plugin.events()
+        self._client = httpx.AsyncClient(
+            base_url=self._api_url, timeout=_TIMEOUT_S, headers=self._headers
+        )
 
     async def stop(self) -> None:
         await self._plugin.stop()
         self._stream = None
+
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+
+        if self._transport is not None:
+            await self._transport.aclose()
+            self._transport = None
 
     async def flush(self) -> int:
         """Post what is queued. Never breaks the app if InfraReplay is down.
@@ -49,7 +125,7 @@ class CaptureAgent:
 
         events = await self._drain()
 
-        if not events:
+        if not events or self._client is None:
             return 0
 
         batches: dict[str, list[Event]] = {}
@@ -58,14 +134,11 @@ class CaptureAgent:
             batches.setdefault(captured.recording_id, []).append(captured)
 
         try:
-            async with httpx.AsyncClient(
-                base_url=self._api_url, timeout=_TIMEOUT_S, headers=self._headers
-            ) as client:
-                for recording_id, batch in batches.items():
-                    await client.post(
-                        _INGEST_PATH.format(rid=recording_id),
-                        json=[e.model_dump(mode="json") for e in batch],
-                    )
+            for recording_id, batch in batches.items():
+                await self._client.post(
+                    _INGEST_PATH.format(rid=recording_id),
+                    json=[e.model_dump(mode="json") for e in batch],
+                )
         except httpx.HTTPError:
             return 0  # capture is best-effort; the app's own work still returns
 
@@ -77,7 +150,7 @@ class CaptureAgent:
         if self._stream is None:
             return []
 
-        events: list[Event] = []
+        events, self._outbound[:] = list(self._outbound), []
 
         while self._plugin.pending():
             events.append(await anext(self._stream))
@@ -105,6 +178,9 @@ class CaptureMiddleware:
             return
 
         correlation_id = headers.get(CORRELATION_HEADER, recording_id)
+        replay_of = headers.get(REPLAY_OF_HEADER)
+        source = headers.get(SOURCE_CORRELATION_HEADER)
+        externals = _externals_mode(headers.get(EXTERNALS_HEADER))
 
         async def flushing_send(message) -> None:
             if message["type"] == "http.response.body" and not message.get("more_body"):
@@ -112,12 +188,28 @@ class CaptureMiddleware:
 
             await send(message)
 
-        token = context.bind(recording_id, correlation_id)
+        token = context.bind(
+            recording_id,
+            correlation_id,
+            replay_of=replay_of,
+            source_correlation=source,
+            externals=externals,
+        )
 
         try:
             await self._app(scope, receive, flushing_send)
         finally:
             context.reset(token)
+            self._agent.forget(correlation_id, replay_of, source)
+
+
+def _externals_mode(raw: str | None) -> context.ExternalsMode:
+    """Anything but an explicit "live" is recorded: replay fails safe."""
+
+    if raw == context.ExternalsMode.LIVE.value:
+        return context.ExternalsMode.LIVE
+
+    return context.ExternalsMode.RECORDED
 
 
 def instrument(app, engine, *, api_url: str | None = None, service: str = "app") -> CaptureAgent:

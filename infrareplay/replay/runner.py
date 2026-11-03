@@ -9,6 +9,7 @@ still in flight (see `infrareplay.agent`).
 
 from time import perf_counter
 
+from infrareplay.capture.context import ExternalsMode
 from infrareplay.comparison import compare_run
 from infrareplay.observability import get_logger, metrics
 from infrareplay.recording import (
@@ -42,6 +43,7 @@ async def run_replay(
     substitutions: dict[str, str] | None = None,
     auto: AutoMode = AutoMode.OFF,
     concurrency: int = 1,
+    externals: ExternalsMode = ExternalsMode.RECORDED,
 ) -> tuple[ReplayRun, dict[str, int]]:
     """Returns the ReplayRun plus a per-category count of the comparison."""
 
@@ -83,6 +85,7 @@ async def run_replay(
             substitutions=substitutions,
             auto=auto,
             concurrency=concurrency,
+            externals=externals,
         )
     except ReplayError as exc:
         metrics.REPLAY_FAILURES.labels(metrics.ReplayFailure.ERROR.value).inc()

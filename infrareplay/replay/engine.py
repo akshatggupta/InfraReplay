@@ -19,11 +19,15 @@ from enum import Enum
 
 from infrareplay import config
 from infrareplay.plugins.mock_capture.fixtures import Scenario, build
+from infrareplay.capture.context import ExternalsMode
 from infrareplay.replay.http_target import HttpTarget
 from infrareplay.replay.substitution import AutoMode, SubstitutionEngine
 from infrareplay.schema import Event, EventType, Recording
 
 MOCK_TARGET = "mock"
+
+# Outbound calls the app made; matches infrareplay.agent.egress.OUTBOUND.
+OUTBOUND = "outbound"
 
 _HTTP_SCHEMES = ("http://", "https://")
 
@@ -66,6 +70,7 @@ async def replay_recording(
     substitutions: dict[str, str] | None = None,
     auto: AutoMode = AutoMode.OFF,
     concurrency: int = 1,
+    externals: ExternalsMode = ExternalsMode.RECORDED,
 ) -> list[Event]:
     """Return the events produced by replaying `source` against `target`.
 
@@ -84,7 +89,7 @@ async def replay_recording(
         return _replay_mock(source, replay_recording_id, subs)
 
     if target.startswith(_HTTP_SCHEMES):
-        return await _replay_http(source, replay_recording_id, target, subs, concurrency)
+        return await _replay_http(source, replay_recording_id, target, subs, concurrency, externals)
 
     raise ReplayError(f"unsupported replay target {target!r}")
 
@@ -135,23 +140,35 @@ async def _replay_http(
     target: str,
     subs: SubstitutionEngine,
     concurrency: int,
+    externals: ExternalsMode,
 ) -> list[Event]:
-    requests = [e for e in source.events if e.event_type is EventType.HTTP_REQUEST]
+    # Only what the client sent. The app's own outbound calls are not
+    # re-sent: the app makes them again and they are answered from the
+    # recording (v11).
+    requests = [
+        e for e in source.events
+        if e.event_type is EventType.HTTP_REQUEST and e.payload.get("direction") != OUTBOUND
+    ]
 
     if not requests:
         raise ReplayError("recording contains no HTTP requests to replay")
 
-    payloads = [subs.apply(r.payload) for r in requests]
+    work = [(subs.apply(r.payload), r.correlation_id) for r in requests]
     replayed: list[Event] = []
 
-    async with HttpTarget(target, recording_id=replay_recording_id) as live:
-        for batch in _batches(payloads, max(concurrency, 1)):
-            for pair in await asyncio.gather(*(live.send(p) for p in batch)):
+    async with HttpTarget(
+        target,
+        recording_id=replay_recording_id,
+        source_recording_id=source.recording_id,
+        externals=externals.value,
+    ) as live:
+        for batch in _batches(work, max(concurrency, 1)):
+            for pair in await asyncio.gather(*(live.send(p, corr) for p, corr in batch)):
                 replayed.extend(pair)
 
     return replayed
 
 
-def _batches(payloads: list[dict], size: int) -> Iterator[list[dict]]:
-    for start in range(0, len(payloads), size):
-        yield payloads[start : start + size]
+def _batches(work: list, size: int) -> Iterator[list]:
+    for start in range(0, len(work), size):
+        yield work[start : start + size]

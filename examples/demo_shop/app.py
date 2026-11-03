@@ -6,7 +6,14 @@ Environment:
     DEMO_SHOP_DATABASE_URL     default sqlite+aiosqlite:///./demo_shop.db
     DEMO_SHOP_LOCK_INVENTORY   "1" switches the reservation bug off
     DEMO_SHOP_RACE_WINDOW_S    how wide the read-then-write window is
+    DEMO_SHOP_PAYMENTS_URL     the payment gateway (default :4000)
+    DEMO_SHOP_PAYMENTS_KEY     the shop's API key at the gateway
     INFRAREPLAY_API_URL        where captured SQL is streamed
+
+The inventory fix can also be flipped while the shop runs — a feature flag,
+so a presenter can replay the bug, switch the fix on, and replay again:
+
+    POST /api/v1/admin/inventory-lock?enabled=true
 
 The app is always instrumented; the agent emits nothing until a request
 arrives carrying InfraReplay's capture headers.
@@ -15,6 +22,7 @@ arrives carrying InfraReplay's capture headers.
 import os
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import delete, func, select
@@ -38,11 +46,22 @@ _DEFAULT_DATABASE_URL = "sqlite+aiosqlite:///./demo_shop.db"
 SERVICE = "demo_shop"
 
 _USER_HEADER = "x-demo-user"
+_DEFAULT_PAYMENTS_URL = "http://127.0.0.1:4000"
+_DEFAULT_PAYMENTS_KEY = "gw_test_key_demo"
+_PAYMENTS_TIMEOUT_S = 10
 _SQLITE_BUSY_TIMEOUT_S = 30
 
 
 def database_url() -> str:
     return os.environ.get("DEMO_SHOP_DATABASE_URL", _DEFAULT_DATABASE_URL)
+
+
+def payments_url() -> str:
+    return os.environ.get("DEMO_SHOP_PAYMENTS_URL", _DEFAULT_PAYMENTS_URL)
+
+
+def payments_key() -> str:
+    return os.environ.get("DEMO_SHOP_PAYMENTS_KEY", _DEFAULT_PAYMENTS_KEY)
 
 
 def race_window_s() -> float:
@@ -76,14 +95,41 @@ def create_app() -> FastAPI:
 
         await agent.start()
         yield
+        await payments.aclose()
         await agent.stop()
 
     app = FastAPI(title="demo_shop", version="1.0.0", lifespan=lifespan)
     agent = instrument(app, engine, service=SERVICE)
 
+    # The gateway client sits on the agent's transport: its calls are
+    # recorded during a capture and answered from the recording on replay.
+    payments = httpx.AsyncClient(
+        base_url=payments_url(),
+        transport=agent.http_transport(),
+        headers={"authorization": f"Bearer {payments_key()}"},
+        timeout=_PAYMENTS_TIMEOUT_S,
+    )
+
+    # None: follow DEMO_SHOP_LOCK_INVENTORY. Set by the admin flag below.
+    lock: dict[str, bool | None] = {"enabled": None}
+
+    def mode() -> Reserve:
+        if lock["enabled"] is None:
+            return reserve_mode()
+
+        return Reserve.ATOMIC if lock["enabled"] else Reserve.READ_THEN_WRITE
+
     @app.get("/health")
     async def health() -> dict:
-        return {"status": "ok", "reserve": reserve_mode().value}
+        return {"status": "ok", "reserve": mode().value, "payments": payments_url()}
+
+    @app.post("/api/v1/admin/inventory-lock")
+    async def inventory_lock(enabled: bool) -> dict:
+        """The fix as a runtime flag: no restart between "bug" and "fixed"."""
+
+        lock["enabled"] = enabled
+
+        return {"reserve": mode().value}
 
     @app.get("/api/v1/inventory")
     async def inventory() -> list[dict]:
@@ -112,7 +158,7 @@ def create_app() -> FastAPI:
         async with sessions() as session:
             await _seed(session, stock, wipe=True)
 
-            return {"reset": True, "stock": stock, "reserve": reserve_mode().value}
+            return {"reset": True, "stock": stock, "reserve": mode().value}
 
     @app.post("/api/v1/checkout")
     async def create_checkout(request: Request) -> JSONResponse:
@@ -131,8 +177,9 @@ def create_app() -> FastAPI:
                 session,
                 handle=handle,
                 body=body,
-                reserve=reserve_mode(),
+                reserve=mode(),
                 race_window_s=race_window_s(),
+                payments=payments,
             )
 
         return JSONResponse(payload, status_code=status)

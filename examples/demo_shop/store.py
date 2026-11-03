@@ -6,6 +6,7 @@
       INSERT orders
       INSERT order_items
       UPDATE inventory         reserve the stock     <- write half of the race
+      POST /v1/charges         the card, at the payment gateway (real HTTP)
       INSERT payments
       COMMIT
 
@@ -23,25 +24,26 @@ import asyncio
 from enum import Enum
 from uuid import uuid4
 
+import httpx
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from examples.demo_shop.models import Inventory, Order, OrderItem, Payment, User
 
+HTTP_OK = 200
 HTTP_CREATED = 201
 HTTP_UNAUTHORIZED = 401
 HTTP_PAYMENT_REQUIRED = 402
 HTTP_CONFLICT = 409
+HTTP_BAD_GATEWAY = 502
 
 SHIPPING_CENTS = 500
 TAX_RATE = 0.12
 
-# The gateway declines above this, or for a card token that asks to be
-# declined — deterministic, so a replay reproduces the same outcome.
-PAYMENT_LIMIT_CENTS = 50_000
-DECLINE_PREFIX = "tok_decline"
-
-PROVIDER = "stripe"
+# Payments are decided by the gateway service, not here: the shop sends the
+# card to POST /v1/charges and records what came back.
+PROVIDER = "gateway"
+CHARGES_PATH = "/v1/charges"
 
 
 class Reserve(str, Enum):
@@ -56,6 +58,7 @@ async def checkout(
     body: dict,
     reserve: Reserve,
     race_window_s: float,
+    payments: httpx.AsyncClient,
 ) -> tuple[int, dict]:
     user = await session.scalar(select(User).where(User.handle == handle))
 
@@ -95,10 +98,20 @@ async def checkout(
         await session.rollback()
         return HTTP_CONFLICT, {"error": "out_of_stock", "skus": short, "order_id": order_id}
 
-    payment = _authorize(order_id, total, body.get("payment_method", {}))
+    payment = await _charge(payments, order_id, total, body.get("payment_method", {}))
+
+    if payment is None:
+        await session.rollback()
+        return HTTP_BAD_GATEWAY, {"error": "payment_gateway_unavailable", "order_id": order_id}
+
     session.add(payment)
 
     if payment.state == "declined":
+        # The card was refused: release what was reserved, keep the record.
+        await _release(session, lines)
+        await session.execute(
+            update(Order).where(Order.id == order_id).values(status="payment_declined")
+        )
         await session.commit()
         return HTTP_PAYMENT_REQUIRED, _declined_body(order_id, payment)
 
@@ -153,6 +166,17 @@ async def _reserve(
     return await _reserve_read_then_write(session, lines, race_window_s)
 
 
+async def _release(session: AsyncSession, lines: list[dict]) -> None:
+    """Undo a reservation: an increment, safe in both reservation modes."""
+
+    for line in lines:
+        await session.execute(
+            update(Inventory)
+            .where(Inventory.sku == line["sku"])
+            .values(available=Inventory.available + line["qty"])
+        )
+
+
 async def _reserve_atomic(session: AsyncSession, lines: list[dict]) -> list[str]:
     short: list[str] = []
 
@@ -194,18 +218,44 @@ async def _reserve_read_then_write(
 # -------------------------------------------------------------------- payment
 
 
-def _authorize(order_id: str, total_cents: int, method: dict) -> Payment:
-    token = str(method.get("token", ""))
-    declined = total_cents > PAYMENT_LIMIT_CENTS or token.startswith(DECLINE_PREFIX)
+async def _charge(
+    payments: httpx.AsyncClient, order_id: str, total_cents: int, method: dict
+) -> Payment | None:
+    """Charge the card at the gateway. None when the gateway cannot answer."""
 
+    try:
+        reply = await payments.post(
+            CHARGES_PATH,
+            json={
+                "amount_cents": total_cents,
+                "currency": "gbp",
+                "source": str(method.get("token", "")),
+                "metadata": {"order_id": order_id},
+            },
+            headers={"idempotency-key": order_id},
+        )
+    except httpx.HTTPError:
+        return None
+
+    if reply.status_code == HTTP_OK:
+        return _payment(order_id, total_cents, "authorized", reply.json()["id"], None)
+
+    if reply.status_code == HTTP_PAYMENT_REQUIRED:
+        error = reply.json().get("error", {})
+        return _payment(order_id, total_cents, "declined", error.get("charge"), error.get("decline_code"))
+
+    return None
+
+
+def _payment(order_id: str, total: int, state: str, reference: str | None, decline: str | None) -> Payment:
     return Payment(
         id=f"pay_{uuid4().hex[:12]}",
         order_id=order_id,
         provider=PROVIDER,
-        state="declined" if declined else "authorized",
-        amount_cents=total_cents,
-        reference=None if declined else f"pi_{uuid4().hex[:14]}",
-        decline_code="insufficient_funds" if declined else None,
+        state=state,
+        amount_cents=total,
+        reference=reference,
+        decline_code=decline,
     )
 
 

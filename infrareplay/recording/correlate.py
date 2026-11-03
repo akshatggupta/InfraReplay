@@ -67,7 +67,9 @@ def _link(group: list[Event]) -> list[Event]:
 
 def _parent_for(event: Event, root: Event | None, last_query: Event | None) -> str | None:
     if event.event_type is EventType.HTTP_REQUEST:
-        return None
+        # The group's first request is the client's; any later one is a call
+        # the app made while serving it (v11), so it hangs under that one.
+        return root.event_id if root and root is not event else None
 
     if event.event_type is EventType.PG_RESULT and last_query is not None:
         return last_query.event_id

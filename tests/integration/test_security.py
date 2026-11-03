@@ -50,7 +50,7 @@ _MARKERS = (
 
 
 @pytest.fixture
-async def secure_stack(tmp_path, monkeypatch):
+async def secure_stack(tmp_path, monkeypatch, gateway):
     monkeypatch.setenv("DEMO_SHOP_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}/shop.db")
     monkeypatch.setenv("DEMO_SHOP_RACE_WINDOW_S", "0")
 
