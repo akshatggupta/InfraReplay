@@ -15,6 +15,8 @@ from infrareplay.schema import Event
 
 _Signature = tuple[int, str, int]
 
+_OUTBOUND = "outbound"
+
 
 def link_streams(original: list[Event], replayed: list[Event]) -> dict[str, str]:
     """Return original event_id -> replayed event_id."""
@@ -41,11 +43,25 @@ def _signatures(events: list[Event]) -> dict[_Signature, str]:
 
     for event in sorted(events, key=lambda e: e.sequence):
         group = group_index.setdefault(event.correlation_id, len(group_index))
-        key = (group, event.event_type.value)
+        kind = _kind(event)
+        key = (group, kind)
 
         occurrence = seen.get(key, 0)
         seen[key] = occurrence + 1
 
-        signatures[(group, event.event_type.value, occurrence)] = event.event_id
+        signatures[(group, kind, occurrence)] = event.event_id
 
     return signatures
+
+
+def _kind(event: Event) -> str:
+    """The event type, with the app's outbound calls counted apart (v11).
+
+    Otherwise a replay that skips an outbound call shifts the pairing, and
+    the gateway's 200 gets compared with the shop's 409.
+    """
+
+    if event.payload.get("direction") == _OUTBOUND:
+        return f"{event.event_type.value}:{_OUTBOUND}"
+
+    return event.event_type.value

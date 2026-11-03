@@ -48,3 +48,32 @@ def test_requests_stay_grouped_even_when_interleaved():
     ordered = [e.event_id for e in correlate(arrived)]
 
     assert ordered == ["req_a", "qry_a", "req_b", "qry_b"]
+
+
+def test_linking_never_pairs_an_outbound_call_with_the_client_response():
+    """v11 regression: a replay that skips the app's outbound call must not
+    shift the pairing, matching the gateway's 200 to the shop's 409."""
+
+    from infrareplay.replay.linking import link_streams
+
+    def ev(eid, event_type, seq, outbound=False):
+        e = _event(event_type, seq, "c", eid)
+        e.sequence = seq
+        if outbound:
+            e.payload = {"direction": "outbound"}
+        return e
+
+    original = [
+        ev("req", EventType.HTTP_REQUEST, 0),
+        ev("out_req", EventType.HTTP_REQUEST, 1, outbound=True),
+        ev("out_res", EventType.HTTP_RESPONSE, 2, outbound=True),
+        ev("res", EventType.HTTP_RESPONSE, 3),
+    ]
+    # The fixed shop turns the shopper away before it calls the gateway.
+    replayed = [ev("r_req", EventType.HTTP_REQUEST, 0), ev("r_res", EventType.HTTP_RESPONSE, 1)]
+
+    links = link_streams(original, replayed)
+
+    assert links.get("res") == "r_res"       # the shopper's response, to the shopper's response
+    assert "out_res" not in links            # the gateway call: missing, not mis-paired
+    assert "out_req" not in links

@@ -89,3 +89,16 @@ async def test_oversell_is_reproduced_then_fixed(stack, monkeypatch):
         _CONFIRMED,
         _CONFLICT,
     ]
+
+    # The shopper's response is compared with the shopper's response: 201
+    # became 409. (Before v11's linking fix it was paired with the gateway's
+    # 200, because the fixed shop never calls the gateway for this shopper.)
+    async with client(api) as api_client:
+        rows = (await api_client.get(f"/api/replays/{fixed['replay_recording_id']}/comparison")).json()
+
+    changed = [
+        r["diff"]["status"]
+        for r in rows
+        if r["category"] == "DIFFERENT" and r["event_type"] == "http.response" and "status" in r["diff"]
+    ]
+    assert changed == [{"original": _CONFIRMED, "replayed": _CONFLICT}]
