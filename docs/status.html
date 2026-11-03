@@ -433,6 +433,11 @@
   .num-bad { color: var(--amber); font-variant-numeric: tabular-nums; }
   td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
   .note { font-size: 0.82rem; color: var(--muted); margin-top: 12px; max-width: 72ch; }
+
+  .num-good { color: var(--good); font-variant-numeric: tabular-nums; }
+  .num-bad { color: var(--amber); font-variant-numeric: tabular-nums; }
+  td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+  .note { font-size: 0.82rem; color: var(--muted); margin-top: 12px; max-width: 72ch; }
 </style>
 </head>
 <body>
@@ -449,7 +454,7 @@
     <div class="facts">
       <span><b>11 of 12</b> versions shipped</span>
       <span><b>92%</b> of the roadmap</span>
-      <span><b>71</b> automated tests</span>
+      <span><b>72</b> automated tests</span>
       <span><b>~11,200</b> lines of Python</span>
     </div>
 
@@ -535,26 +540,26 @@
     <div class="term">
       <div class="bar">infractl · traffic → replay → ledger → race → fix → compare</div>
 <pre><span class="cmd">$ infractl demo traffic</span>
-rec_96b813950177  [completed]  Checkout — live traffic
+rec_37640a5acb8b  [completed]  Checkout — live traffic
   62 events · responses 201, 201, 402 · 3 payment-gateway calls
 
 <span class="cmd">$ examples/demo_shop/control.sh ledger   # the payment gateway's own count</span>
 charges: 3
 
-<span class="cmd">$ infractl replay rec_96b813950177</span>
-replay rpl_0ee03e95723b against http://127.0.0.1:3000
+<span class="cmd">$ infractl replay rec_37640a5acb8b</span>
+replay rpl_3f93a87c3698 against http://127.0.0.1:3000
 summary: {'MATCH': 31, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
 
 <span class="cmd">$ examples/demo_shop/control.sh ledger</span>
 <span class="ok">charges: 3   &lt;- unchanged: the replay charged nobody</span>
 
-<span class="cmd">$ infractl recordings show rpl_0ee03e95723b   # the replay's payment calls</span>
+<span class="cmd">$ infractl recordings show rpl_3f93a87c3698   # the replay's payment calls</span>
  outbound 200 stubbed = True
  outbound 200 stubbed = True
  outbound 402 stubbed = True
 
-<span class="cmd">$ infractl replay rec_96b813950177 --externals live</span>
-replay rpl_9e97ec194563 against http://127.0.0.1:3000
+<span class="cmd">$ infractl replay rec_37640a5acb8b --externals live</span>
+replay rpl_8ad4adef75b4 against http://127.0.0.1:3000
 summary: {'MATCH': 28, 'DIFFERENT': 2, 'MISSING': 1, 'NEW': 0, 'ERROR': 0}
 # live: the gateway is really called — with the card token as stored, masked,
 # so the declined card is approved this time. Why recorded is the default.
@@ -563,14 +568,14 @@ summary: {'MATCH': 28, 'DIFFERENT': 2, 'MISSING': 1, 'NEW': 0, 'ERROR': 0}
 <span class="ok">charges: 6   &lt;- only when asked: --externals live</span>
 
 <span class="cmd">$ infractl demo race</span>
-rec_f222456c3278  [completed]  Checkout — oversell race
+rec_18b9fde3be97  [completed]  Checkout — oversell race
   36 events · responses 201, 201 · 2 payment-gateway calls
 
 <span class="cmd">$ examples/demo_shop/control.sh restock 1</span>
 {"reset":true,"stock":1,"reserve":"read_then_write"}
 
-<span class="cmd">$ infractl replay rec_f222456c3278 --concurrency 2</span>
-replay rpl_2a76b7632f42 against http://127.0.0.1:3000
+<span class="cmd">$ infractl replay rec_18b9fde3be97 --concurrency 2</span>
+replay rpl_2e505b065b8a against http://127.0.0.1:3000
 summary: {'MATCH': 18, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
 
 <span class="cmd">$ examples/demo_shop/control.sh fix on</span>
@@ -579,18 +584,18 @@ summary: {'MATCH': 18, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
 <span class="cmd">$ examples/demo_shop/control.sh restock 1</span>
 {"reset":true,"stock":1,"reserve":"atomic"}
 
-<span class="cmd">$ infractl replay rec_f222456c3278 --concurrency 2</span>
-replay rpl_ddc11016ef9f against http://127.0.0.1:3000
+<span class="cmd">$ infractl replay rec_18b9fde3be97 --concurrency 2</span>
+replay rpl_6cb860531ba9 against http://127.0.0.1:3000
 summary: {'MATCH': 13, 'DIFFERENT': 2, 'MISSING': 3, 'NEW': 0, 'ERROR': 0}
 
-<span class="cmd">$ infractl compare rpl_ddc11016ef9f | grep -v ^MATCH</span>
+<span class="cmd">$ infractl compare rpl_6cb860531ba9 | grep -v ^MATCH</span>
 <span class="warn">DIFFERENT  postgres.result  {'rows_affected': {'original': 1, 'replayed': 0}}</span>
-<span class="warn">DIFFERENT  http.response    {'status': {'original': 200, 'replayed': 409}, 'body': {'original': {'id': '&lt;id&gt;', 'status': 'succeeded', 'amount_cents': 4978, 'currency': 'g</span>
-<span class="warn">MISSING    postgres.result  </span>
-<span class="warn">MISSING    postgres.result  </span>
 <span class="warn">MISSING    http.response    </span>
+<span class="warn">MISSING    postgres.result  </span>
+<span class="warn">MISSING    postgres.result  </span>
+<span class="warn">DIFFERENT  http.response    {'status': {'original': 201, 'replayed': 409}, 'body': {'original': {'order_id': '&lt;id&gt;', 'status': 'confirmed', 'currency': 'GBP', 'totals': {</span>
 
-<span class="cmd">$ infractl replay rec_96b813950177 --target https://api.production.example.com</span>
+<span class="cmd">$ infractl replay rec_37640a5acb8b --target https://api.production.example.com</span>
 <span class="warn">error 400: target 'https://api.production.example.com' looks like production; pass unsafe to override</span>
 
 <span class="cmd">$ infractl benchmark show</span>
@@ -601,12 +606,12 @@ medium      20      -24.0%    +150 ms      +0 ms    100.0%        0
 heavy       50      -45.7%    +950 ms   +1800 ms    100.0%        0
 
 <span class="cmd">$ infractl audit list --limit 6</span>
-2026-11-02T20:16:35  failed replay.run        anonymous    rec_96b813950177  https://api.production.example.com
-2026-11-02T20:16:10  ok     replay.run        anonymous    rec_f222456c3278  http://127.0.0.1:3000
-2026-11-02T20:16:01  ok     replay.run        anonymous    rec_f222456c3278  http://127.0.0.1:3000
-2026-11-02T20:15:45  ok     demo.traffic      anonymous    rec_f222456c3278  http://127.0.0.1:3000
-2026-11-02T20:15:36  ok     replay.run        anonymous    rec_96b813950177  http://127.0.0.1:3000
-2026-11-02T20:15:10  ok     replay.run        anonymous    rec_96b813950177  http://127.0.0.1:3000</pre>
+2026-11-03T05:40:58  failed replay.run        anonymous    rec_37640a5acb8b  https://api.production.example.com
+2026-11-03T05:40:38  ok     replay.run        anonymous    rec_18b9fde3be97  http://127.0.0.1:3000
+2026-11-03T05:40:31  ok     replay.run        anonymous    rec_18b9fde3be97  http://127.0.0.1:3000
+2026-11-03T05:40:14  ok     demo.traffic      anonymous    rec_18b9fde3be97  http://127.0.0.1:3000
+2026-11-03T05:40:05  ok     replay.run        anonymous    rec_37640a5acb8b  http://127.0.0.1:3000
+2026-11-03T05:39:39  ok     replay.run        anonymous    rec_37640a5acb8b  http://127.0.0.1:3000</pre>
     </div>
   </section>
 

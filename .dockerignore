@@ -8,3 +8,6 @@ __pycache__/
 data/
 docs/
 tests/
+benchmark/results/2*/
+benchmark/results/*/logs/
+their_catalogue.json

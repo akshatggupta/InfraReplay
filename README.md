@@ -42,6 +42,9 @@ docker build -t infrareplay . && docker run --rm --name infrareplay \
 On boot it records two real sessions — ordinary checkout traffic and the
 oversell race — so the dashboard and TUI open on real recordings.
 
+Port already taken? Map it elsewhere, e.g. `-p 8088:8080` for the dashboard
+(Compose: `INFRAREPLAY_DASHBOARD_HOST_PORT=8088 docker compose up`).
+
 | Port | What |
 |---|---|
 | 8080 | web dashboard |
@@ -74,14 +77,14 @@ infractl tui                                              # or the terminal UI
 
 ```
 $ infractl demo traffic
-rec_96b813950177  [completed]  Checkout — live traffic
+rec_37640a5acb8b  [completed]  Checkout — live traffic
   62 events · responses 201, 201, 402 · 3 payment-gateway calls
 
 $ examples/demo_shop/control.sh ledger   # the payment gateway's own count
 charges: 3
 
-$ infractl replay rec_96b813950177
-replay rpl_0ee03e95723b against http://127.0.0.1:3000
+$ infractl replay rec_37640a5acb8b
+replay rpl_3f93a87c3698 against http://127.0.0.1:3000
 summary: {'MATCH': 31, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
 
 $ examples/demo_shop/control.sh ledger
@@ -93,30 +96,35 @@ once — recorded, reproduced, fixed with a feature flag, and shown fixed:
 
 ```
 $ infractl demo race
-rec_f222456c3278  [completed]  Checkout — oversell race
-  36 events · responses 201, 201 · 2 payment-gateway calls      # one unit, sold twice
+rec_18b9fde3be97  [completed]  Checkout — oversell race
+  36 events · responses 201, 201 · 2 payment-gateway calls
 
 $ examples/demo_shop/control.sh restock 1
-$ infractl replay rec_f222456c3278 --concurrency 2
-summary: {'MATCH': 18, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}   # reproduced
+
+$ infractl replay rec_18b9fde3be97 --concurrency 2
+replay rpl_2e505b065b8a against http://127.0.0.1:3000
+summary: {'MATCH': 18, 'DIFFERENT': 0, 'MISSING': 0, 'NEW': 0, 'ERROR': 0}
 
 $ examples/demo_shop/control.sh fix on
+
 $ examples/demo_shop/control.sh restock 1
-$ infractl replay rec_f222456c3278 --concurrency 2
+
+$ infractl replay rec_18b9fde3be97 --concurrency 2
+replay rpl_6cb860531ba9 against http://127.0.0.1:3000
 summary: {'MATCH': 13, 'DIFFERENT': 2, 'MISSING': 3, 'NEW': 0, 'ERROR': 0}
 
-$ infractl compare rpl_ddc11016ef9f | grep -v ^MATCH
+$ infractl compare rpl_6cb860531ba9 | grep -v ^MATCH
 DIFFERENT  postgres.result  {'rows_affected': {'original': 1, 'replayed': 0}}
-DIFFERENT  http.response    {'status': {'original': 200, 'replayed': 409}, ...}
-MISSING    postgres.result
-MISSING    postgres.result
-MISSING    http.response
+MISSING    http.response    
+MISSING    postgres.result  
+MISSING    postgres.result  
+DIFFERENT  http.response    {'status': {'original': 201, 'replayed': 409}, ...}
 ```
 
 With the fix, the reserving `UPDATE` changes no row, the second shopper gets a
-409 instead of a charge, and the payment call and its SQL never happen —
-which is exactly what the MISSING rows say. The full run, including the
-production-target refusal, the benchmark and the audit log:
+409 instead of a 201, and that shopper's payment call and its two SQL
+statements never happen — which is exactly what the MISSING rows say. The full
+run, including the production-target refusal, the benchmark and the audit log:
 `docs/demo-transcript.txt`.
 
 ## What capture costs — measured (v10)
@@ -196,7 +204,7 @@ the shop and its gateway during a demo.
 ## Tests
 
 ```bash
-pytest                 # 71 tests; one skips unless a stack is running
+pytest                 # 72 tests; one skips unless a stack is running
 benchmark/run.sh       # the load benchmark, ~7 minutes — run nothing else meanwhile
 ```
 

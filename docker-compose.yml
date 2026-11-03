@@ -80,7 +80,8 @@ services:
       INFRAREPLAY_API_URL: http://api:8000
       INFRAREPLAY_DASHBOARD_PORT: "8080"
     ports:
-      - "8080:8080"
+      # Host port overridable when 8080 is taken: INFRAREPLAY_DASHBOARD_HOST_PORT=8088
+      - "${INFRAREPLAY_DASHBOARD_HOST_PORT:-8080}:8080"
     depends_on:
       api:
         condition: service_healthy
