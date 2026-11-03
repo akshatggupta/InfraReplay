@@ -18,6 +18,13 @@ from nicegui import ui
 _API = os.environ.get("INFRAREPLAY_API_URL", "http://127.0.0.1:8000")
 _TIMEOUT_S = 30
 
+# A replay targets the live shop unless told otherwise; "mock" is synthetic.
+_DEFAULT_TARGET = os.environ.get(
+    "INFRAREPLAY_DEFAULT_TARGET",
+    os.environ.get("INFRAREPLAY_DEMO_SHOP_URL", "http://127.0.0.1:3000"),
+)
+_OUTBOUND = "outbound"
+
 # Sent on every call once the API has keys configured (v8).
 _HEADERS = (
     {"x-api-key": os.environ["INFRAREPLAY_API_KEY"]}
@@ -145,8 +152,14 @@ def _event_title(e: dict) -> str:
     p = e["payload"]
     kind = e["event_type"]
 
+    if kind == "http.request" and p.get("direction") == _OUTBOUND:
+        return f"↗ {p.get('method')} {p.get('host')}{p.get('path')}"
+
     if kind == "http.request":
         return f"{p.get('method')} {p.get('path')}"
+
+    if kind == "http.response" and p.get("stubbed"):
+        return f"HTTP {p.get('status')} · from the recording"
 
     if kind == "http.response":
         return f"HTTP {p.get('status')}"
@@ -215,13 +228,26 @@ async def index() -> None:
             ui.label("Recordings").classes("text-2xl font-semibold text-white")
             ui.space()
 
-            async def seed() -> None:
-                await _post("/api/demo/seed")
-                ui.navigate.reload()
+            async def record(body: dict) -> None:
+                ui.notify("Recording real checkouts through a live capture…")
 
-            ui.button("Seed demo data", on_click=seed, icon="add").props(
-                "unelevated color=teal-6"
-            )
+                if await _try_post("/api/demo/traffic", body):
+                    ui.navigate.reload()
+
+            # Real traffic, not fixtures: real HTTP, SQL and payment calls.
+            ui.button(
+                "Record live traffic",
+                on_click=lambda: record({"checkouts": 3, "declined": 1}),
+                icon="fiber_manual_record",
+            ).props("unelevated color=teal-6")
+            ui.button(
+                "Record oversell race",
+                on_click=lambda: record(
+                    {"checkouts": 2, "declined": 0, "concurrent": True, "stock": 1,
+                     "title": "Checkout — oversell race"}
+                ),
+                icon="bolt",
+            ).props("outline color=amber-5")
 
         try:
             recs = await _get("/api/recordings")
@@ -233,7 +259,7 @@ async def index() -> None:
         _plugin_strip(plugins)
 
         if not recs:
-            ui.label("No recordings yet — click “Seed demo data”.").classes(
+            ui.label("No recordings yet — click “Record live traffic”.").classes(
                 "text-slate-500"
             )
             return
@@ -470,16 +496,19 @@ def _replay_button(recording_id: str) -> None:
     with ui.dialog() as dialog, ui.element("div").classes("ir-card p-5 w-96"):
         ui.label("Replay").classes("text-lg font-semibold text-white")
 
-        target = ui.input("Target", value="mock").classes("w-full").props(
+        target = ui.input("Target", value=_DEFAULT_TARGET).classes("w-full").props(
             "dark dense outlined"
         )
-        ui.label("mock, or a live URL like http://127.0.0.1:3000").classes(
+        ui.label("the live service to replay against").classes(
             "text-xs text-slate-500"
         )
         concurrency = ui.number("Concurrency", value=1, format="%d").props(
             "dark dense outlined"
         )
         unsafe = ui.checkbox("Allow production-looking targets").classes("text-slate-400")
+        live = ui.checkbox(
+            "Really call external services (off: answered from the recording)"
+        ).classes("text-slate-400")
 
         async def run() -> None:
             dialog.close()
@@ -491,6 +520,7 @@ def _replay_button(recording_id: str) -> None:
                     "target": target.value,
                     "concurrency": int(concurrency.value or 1),
                     "unsafe": unsafe.value,
+                    "externals": "live" if live.value else "recorded",
                 },
             )
 

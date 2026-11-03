@@ -1,11 +1,14 @@
-"""The TUI, driven headlessly by Textual's Pilot against a live API.
+"""The TUI, driven headlessly by Textual's Pilot against a live stack.
 
 These press real keys and assert on what the widgets hold, so they cover
-the wiring — focus, workers, screens — not just the rendering helpers.
+the wiring — focus, workers, screens — not just the rendering helpers. The
+traffic is real: pressing `t` drives real checkouts through a real capture
+of the demo shop, which pays through the real payment gateway.
 """
 
 import io
 
+import httpx
 import pytest
 from rich.console import Console
 from textual.widgets import DataTable, Digits, Static
@@ -19,7 +22,7 @@ from tests.support.live import LiveServer
 
 _SIZE = (150, 46)
 _SETTLE_S = 1.5
-_POLL_WAIT_S = 3.0  # longer than one poll tick
+_WAIT_S = 30.0  # a ceiling, not a delay: each wait ends as soon as its condition holds
 
 
 @pytest.fixture
@@ -28,15 +31,15 @@ async def api_server():
         yield server
 
 
-async def _seeded(server) -> dict:
-    api = Api(server.url)
+@pytest.fixture
+def live(stack, monkeypatch):
+    """The live stack, with the TUI's defaults pointed at its shop."""
 
-    try:
-        seeded = await api.seed()
-    finally:
-        await api.close()
+    api, shop = stack
+    monkeypatch.setattr(config, "DEMO_SHOP_URL", shop.url)
+    monkeypatch.setattr(config, "DEFAULT_TARGET", shop.url)
 
-    return next(r for r in seeded if "fails" in r["title"])
+    return api, shop
 
 
 def _plain(widget: Static) -> str:
@@ -48,83 +51,103 @@ def _plain(widget: Static) -> str:
     return console.export_text()
 
 
+async def _until(pilot, condition, what: str) -> None:
+    """Wait for the UI to reach a state, rather than for a fixed time."""
+
+    waited = 0.0
+
+    while not condition():
+        if waited > _WAIT_S:
+            raise AssertionError(f"timed out after {_WAIT_S:.0f}s waiting for {what}")
+
+        await pilot.pause(0.2)
+        waited += 0.2
+
+
 def _tile(app, name: str) -> int:
     return int(app.query_one(f"#tile-{name}", Digits).value)
 
 
-async def test_overview_tiles_follow_new_work(api_server):
+async def _record(api_url: str) -> dict:
+    async with httpx.AsyncClient(base_url=api_url, timeout=30) as c:
+        return (await c.post("/api/demo/traffic", json={"checkouts": 2, "declined": 0})).json()
+
+
+async def test_overview_tiles_follow_new_work(live):
     # Counters are process-wide and other tests have moved them, so this
     # asserts on what changes while the TUI watches, not on absolutes.
-    app = InfraReplayApp(api=Api(api_server.url))
+    api, _ = live
+    app = InfraReplayApp(api=Api(api.url))
 
     async with app.run_test(size=_SIZE) as pilot:
         await pilot.pause(_SETTLE_S)
 
         recordings, events = _tile(app, "recordings"), _tile(app, "events")
 
-        await _seeded(api_server)
-        await pilot.pause(_POLL_WAIT_S)
+        recorded = await _record(api.url)
+        await _until(pilot, lambda: _tile(app, "recordings") > recordings, "the tiles to update")
 
         assert "connected" in _plain(app.query_one("#status", Static))
-        assert _tile(app, "recordings") - recordings == 2
-        assert _tile(app, "events") - events == 28
+        assert _tile(app, "recordings") - recordings == 1
+        assert _tile(app, "events") - events == len(recorded["events"])
+        assert _tile(app, "dropped") == 0
         assert app.query_one("#recent-table", DataTable).row_count >= 1
 
 
-async def test_recording_to_replay_to_comparison(api_server):
-    buggy = await _seeded(api_server)
-
-    app = InfraReplayApp(api=Api(api_server.url))
+async def test_record_replay_compare_on_real_traffic(live):
+    api, _ = live
+    app = InfraReplayApp(api=Api(api.url))
 
     async with app.run_test(size=_SIZE) as pilot:
-        await pilot.press("2")
-        await pilot.pause(_SETTLE_S)
+        # `t`: three real checkouts through a live capture, one card declined.
+        await pilot.press("t")
 
         table = app.query_one("#recordings-table", DataTable)
-        keys = [row.value for row in table.rows]
-        table.move_cursor(row=keys.index(buggy["recording_id"]))
+        await _until(pilot, lambda: table.row_count == 1, "the new recording to be listed")
+        await pilot.pause(0.3)  # let the tab's focus settle on the table
 
-        # Enter works straight away: switching tabs focuses the table.
         await pilot.press("enter")
-        await pilot.pause(_SETTLE_S)
+        await _until(
+            pilot,
+            lambda: isinstance(app.screen, RecordingScreen)
+            and app.screen.query_one("#events", DataTable).row_count > 0,
+            "the recording's timeline",
+        )
 
-        assert isinstance(app.screen, RecordingScreen)
-        assert app.screen.query_one("#events", DataTable).row_count == 14
+        timeline = app.screen.query_one("#events", DataTable)
+        titles = [str(timeline.get_row_at(i)[2]) for i in range(timeline.row_count)]
+
+        assert any("/v1/charges" in t for t in titles)  # the real payment calls
+        assert any("INSERT INTO orders" in t for t in titles)  # the real SQL
 
         await pilot.press("r")
-        await pilot.pause(0.5)
-        assert isinstance(app.screen, ReplayDialog)
+        await _until(pilot, lambda: isinstance(app.screen, ReplayDialog), "the replay dialog")
 
-        await pilot.press("enter")  # default target: mock
-        await pilot.pause(_SETTLE_S + 1)
+        await pilot.press("enter")  # default target: the live shop
+        await _until(
+            pilot,
+            lambda: isinstance(app.screen, ComparisonScreen)
+            and app.screen.query_one("#pairs", DataTable).row_count > 0,
+            "the comparison",
+        )
 
-        assert isinstance(app.screen, ComparisonScreen)
-
-        pairs = app.screen.query_one("#pairs", DataTable)
-        first = pairs.get_row_at(0)
-
-        assert pairs.row_count == 6
-        assert "DIFFERENT" in str(first[0])  # differences are listed first
-        assert "differences" in _plain(app.screen.query_one("#verdict", Static))
-
-        # The inspector names the exact field that changed.
-        assert "rows[0].state" in _plain(app.screen.query_one("#detail", Static))
+        # The same shop, the same answers from the gateway's recording.
+        assert "matched" in _plain(app.screen.query_one("#verdict", Static))
 
 
-async def test_refused_replay_is_a_toast_not_a_crash(api_server):
-    buggy = await _seeded(api_server)
-
-    app = InfraReplayApp(api=Api(api_server.url))
+async def test_refused_replay_is_a_toast_not_a_crash(live):
+    api, _ = live
+    recorded = await _record(api.url)
+    app = InfraReplayApp(api=Api(api.url))
 
     async with app.run_test(size=_SIZE) as pilot:
-        app.push_screen(RecordingScreen(app.api, buggy["recording_id"]))
+        app.push_screen(RecordingScreen(app.api, recorded["recording_id"]))
         await pilot.pause(_SETTLE_S)
 
         await pilot.press("r")
         await pilot.pause(0.5)
 
-        target = app.screen.query_one("#target")
-        target.value = "https://api.production.example.com"
+        app.screen.query_one("#target").value = "https://api.production.example.com"
         await pilot.press("enter")
         await pilot.pause(_SETTLE_S)
 
@@ -152,6 +175,34 @@ async def test_capture_start_and_stop_from_the_tui(api_server):
 
         assert isinstance(app.screen, RecordingScreen)  # opens what was recorded
         assert sessions.row_count == 0
+
+
+async def test_benchmarks_tab_shows_the_latest_report(api_server, tmp_path, monkeypatch):
+    latest = tmp_path / "latest"
+    latest.mkdir()
+    (latest / "summary.json").write_text(
+        '{"started_at": "2026-11-02T00:00:00+00:00", '
+        '"machine": {"cpu": "test cpu", "logical_cores": 4, "ram_gb": 8.0}, '
+        '"backend": {"api_db": "sqlite", "shop_db": "sqlite"}, '
+        '"levels": [{"level": "light", "users": 5, '
+        '"overhead": {"throughput_change_pct": -12.5, "checkout_p50_added_ms": 9.0, '
+        '"checkout_p95_added_ms": 20.0, "checkout_p99_added_ms": 30.0}, '
+        '"direct": {"stats": {}}, '
+        '"captured": {"stats": {}, "capture": {"completeness_pct": 100.0, "events_dropped": 0}}}]}'
+    )
+    monkeypatch.setattr(config, "BENCHMARK_DIR", tmp_path)
+
+    app = InfraReplayApp(api=Api(api_server.url))
+
+    async with app.run_test(size=_SIZE) as pilot:
+        await pilot.press("6")
+        await pilot.pause(_SETTLE_S)
+
+        shown = _plain(app.query_one("#benchmarks-view", Static))
+
+        assert "-12.5%" in shown
+        assert "+9.0 ms" in shown
+        assert "100.0%" in shown
 
 
 async def test_unreachable_api_is_reported_and_survived():

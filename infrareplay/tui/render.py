@@ -27,6 +27,9 @@ CATEGORY_STYLE = {
 
 OUTCOME_STYLE = {"ok": "#34d399", "failed": "#fbbf24", "denied": "#f87171"}
 
+OUTBOUND = "outbound"
+OUTBOUND_STYLE = ("↗", "#f59e0b")
+
 # event_type -> (glyph, colour)
 EVENT_STYLE = {
     "http.request": ("⇄", "#818cf8"),
@@ -122,8 +125,14 @@ def event_title(event: dict) -> str:
     p = event.get("payload", {})
     kind_ = event.get("event_type", "")
 
+    if kind_ == "http.request" and p.get("direction") == OUTBOUND:
+        return f"{p.get('method', '')} {p.get('host', '')}{p.get('path', '')}"
+
     if kind_ == "http.request":
         return f"{p.get('method', '')} {p.get('path', '')}"
+
+    if kind_ == "http.response" and p.get("stubbed"):
+        return f"HTTP {p.get('status', '?')} · from the recording"
 
     if kind_ == "http.response":
         return f"HTTP {p.get('status', p.get('error', '?'))}"
@@ -139,8 +148,15 @@ def event_title(event: dict) -> str:
     return kind_
 
 
+def _style(event: dict) -> tuple[str, str]:
+    if event.get("payload", {}).get("direction") == OUTBOUND:
+        return OUTBOUND_STYLE
+
+    return EVENT_STYLE.get(event.get("event_type", ""), ("•", MUTED))
+
+
 def event_glyph(event: dict) -> Text:
-    glyph, color = EVENT_STYLE.get(event.get("event_type", ""), ("•", MUTED))
+    glyph, color = _style(event)
 
     return Text(glyph, style=f"bold {color}")
 
@@ -148,7 +164,7 @@ def event_glyph(event: dict) -> Text:
 def waterfall_bar(event: dict, t0: int, span: int, width: int) -> Text:
     """Where this event sits in the request, drawn to `width` cells."""
 
-    _, color = EVENT_STYLE.get(event.get("event_type", ""), ("•", MUTED))
+    _, color = _style(event)
 
     start = int((event["timestamp_ns"] - t0) / span * width)
     length = max(1, round(event["duration_ns"] / span * width))
@@ -214,11 +230,15 @@ def event_detail(event: dict):
         return Group(header, meta, Text(), *body)
 
     if kind_ == "http.request":
+        where = f"{p.get('host', '')}{p.get('path', '')}" if p.get("direction") == OUTBOUND else p.get("path", "")
+        label = "outbound call the app made" if p.get("direction") == OUTBOUND else "request from the client"
+
         return Group(
             header,
             meta,
             Text(),
-            Text(f"{p.get('method', '')} {p.get('path', '')}", style="bold"),
+            Text(label, style=f"bold {MUTED}"),
+            Text(f"{p.get('method', '')} {where}", style="bold"),
             Text("headers", style=f"bold {MUTED}"),
             _kv(sorted((p.get("headers") or {}).items())),
             Text("body", style=f"bold {MUTED}"),

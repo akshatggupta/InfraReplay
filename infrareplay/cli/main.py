@@ -17,6 +17,7 @@ capture_app = typer.Typer(help="Live capture sessions")
 projects_app = typer.Typer(help="Projects")
 audit_app = typer.Typer(help="Audit log of capture, replay and bundle actions")
 security_app = typer.Typer(help="Keys for encryption at rest")
+bench_app = typer.Typer(help="Capture-overhead benchmark (run it with benchmark/run.sh)")
 
 app.add_typer(demo_app, name="demo")
 app.add_typer(recordings_app, name="recordings")
@@ -25,6 +26,7 @@ app.add_typer(capture_app, name="capture")
 app.add_typer(projects_app, name="projects")
 app.add_typer(audit_app, name="audit")
 app.add_typer(security_app, name="security")
+app.add_typer(bench_app, name="benchmark")
 
 _TIMEOUT_S = 30
 _LOCALHOST = "http://127.0.0.1"
@@ -49,9 +51,63 @@ def _fail(resp: httpx.Response) -> None:
 # ------------------------------------------------------------------- demo
 
 
+@demo_app.command("traffic")
+def demo_traffic(
+    checkouts: int = typer.Option(3, help="real checkouts to send"),
+    declined: int = typer.Option(1, help="how many of them use a declined card"),
+    concurrent: bool = typer.Option(False, help="send them all at once"),
+    stock: int = typer.Option(None, help="restock every product to this first (default 100)"),
+    title: str = typer.Option("Checkout — live traffic", help="recording title"),
+    upstream: str = typer.Option(None, help="the shop (default: the API's demo shop)"),
+) -> None:
+    """Record real checkouts through a live capture of the demo shop."""
+
+    body = {"checkouts": checkouts, "declined": declined, "concurrent": concurrent, "title": title}
+
+    # Unset means "the API's default" (restock first) — not "leave the shop as is".
+    if stock is not None:
+        body["stock"] = stock
+
+    if upstream:
+        body["upstream"] = upstream
+
+    _show_traffic(body)
+
+
+@demo_app.command("race")
+def demo_race() -> None:
+    """Record the oversell race: one unit in stock, two shoppers at once."""
+
+    _show_traffic(
+        {"checkouts": 2, "declined": 0, "concurrent": True, "stock": 1,
+         "title": "Checkout — oversell race"}
+    )
+
+
+def _show_traffic(body: dict) -> None:
+    with _client() as c:
+        resp = c.post("/api/demo/traffic", json=body)
+
+    if resp.is_error:
+        _fail(resp)
+
+    rec = resp.json()
+    events = rec["events"]
+    statuses = [
+        str(e["payload"].get("status"))
+        for e in events
+        if e["event_type"] == "http.response" and e["payload"].get("direction") != "outbound"
+    ]
+    outbound = sum(1 for e in events if e["event_type"] == "http.request"
+                   and e["payload"].get("direction") == "outbound")
+
+    typer.echo(f"{rec['recording_id']}  [{rec['status']}]  {rec['title']}")
+    typer.echo(f"  {len(events)} events · responses {', '.join(statuses)} · {outbound} payment-gateway calls")
+
+
 @demo_app.command("seed")
 def demo_seed() -> None:
-    """Create the clean and buggy fixture recordings."""
+    """Create the two SYNTHETIC fixture recordings (tests and offline use)."""
 
     with _client() as c:
         resp = c.post("/api/demo/seed")
@@ -181,6 +237,43 @@ def tui() -> None:
     main()
 
 
+# --------------------------------------------------------------- benchmark
+
+
+@bench_app.command("show")
+def benchmark_show() -> None:
+    """The latest benchmark/run.sh report: what capture costs under load."""
+
+    with _client() as c:
+        resp = c.get("/api/benchmarks/latest")
+
+    if resp.is_error:
+        _fail(resp)
+
+    report = resp.json()
+    typer.echo(f"run {report['started_at']} · {report['machine']['cpu']}")
+    typer.echo(f"{'load':<8}{'users':>6}{'throughput':>12}{'p50 added':>11}{'p95 added':>11}{'complete':>10}{'dropped':>9}")
+
+    for row in report["levels"]:
+        o, cap = row["overhead"], row["captured"]["capture"]
+        typer.echo(
+            f"{row['level']:<8}{row['users']:>6}{_pct(o['throughput_change_pct']):>12}"
+            f"{_ms(o['checkout_p50_added_ms']):>11}{_ms(o['checkout_p95_added_ms']):>11}"
+            f"{_pct(cap.get('completeness_pct'), signed=False):>10}{cap.get('events_dropped', '—')!s:>9}"
+        )
+
+
+def _pct(value, signed: bool = True) -> str:
+    if value is None:
+        return "—"
+
+    return f"{value:+.1f}%" if signed else f"{value:.1f}%"
+
+
+def _ms(value) -> str:
+    return "—" if value is None else f"{value:+.0f} ms"
+
+
 # ------------------------------------------------------------------- audit
 
 
@@ -299,24 +392,30 @@ def capture_list() -> None:
 @app.command("replay")
 def replay(
     recording_id: str,
-    target: str = typer.Option("mock", help="replay target url or 'mock'"),
+    target: str = typer.Option(None, help="target URL (default: the live demo shop); 'mock' is synthetic"),
     unsafe: bool = typer.Option(False, help="allow production-looking targets"),
     sub: list[str] = typer.Option(
         [], "--sub", help="substitution old=new, repeatable; ${uuid} expands"
     ),
     auto_subs: bool = typer.Option(False, help="give UUID-shaped values a fresh id"),
     concurrency: int = typer.Option(1, help="requests in flight at once"),
+    externals: str = typer.Option(
+        "recorded", help="the target's outbound calls: recorded (default, safe) or live"
+    ),
 ) -> None:
     """Replay a recording and run the comparison."""
 
     body = {
         "recording_id": recording_id,
-        "target": target,
+        "externals": externals,
         "unsafe": unsafe,
         "auto_substitute": auto_subs,
         "substitutions": dict(p.split("=", 1) for p in sub) or None,
         "concurrency": concurrency,
     }
+
+    if target:
+        body["target"] = target
 
     with _client() as c:
         resp = c.post("/api/replays", json=body)

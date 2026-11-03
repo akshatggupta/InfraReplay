@@ -2,10 +2,11 @@
 #
 # One image, four roles.
 #
-#   INFRAREPLAY_ROLE=all         API + demo shop + dashboard in one container
-#   INFRAREPLAY_ROLE=api         the API alone            (compose)
-#   INFRAREPLAY_ROLE=shop        the demo shop alone      (compose)
-#   INFRAREPLAY_ROLE=dashboard   the dashboard alone      (compose)
+#   INFRAREPLAY_ROLE=all         API + shop + payment gateway + dashboard
+#   INFRAREPLAY_ROLE=api         the API alone               (compose)
+#   INFRAREPLAY_ROLE=shop        the demo shop alone         (compose)
+#   INFRAREPLAY_ROLE=payments    the payment gateway alone   (compose)
+#   INFRAREPLAY_ROLE=dashboard   the dashboard alone         (compose)
 #
 # Any arguments passed to the container are run instead, so
 # `docker run ... infrareplay infractl recordings list` still works.
@@ -22,12 +23,17 @@ ROLE="${INFRAREPLAY_ROLE:-all}"
 
 API_PORT="${INFRAREPLAY_API_PORT:-8000}"
 SHOP_PORT="${DEMO_SHOP_PORT:-3000}"
+PAYMENTS_PORT="${PAYMENT_GATEWAY_PORT:-4000}"
 DASHBOARD_PORT="${INFRAREPLAY_DASHBOARD_PORT:-8080}"
 
 # The API logs every request itself, as JSON; uvicorn's access log would
 # only interleave plain-text duplicates.
 start_api() {
   uvicorn infrareplay.api.app:app --host 0.0.0.0 --port "$API_PORT" --no-access-log &
+}
+
+start_payments() {
+  uvicorn examples.payment_gateway.app:app --host 0.0.0.0 --port "$PAYMENTS_PORT" &
 }
 
 start_shop() {
@@ -41,10 +47,11 @@ start_dashboard() {
 case "$ROLE" in
   api)       exec uvicorn infrareplay.api.app:app --host 0.0.0.0 --port "$API_PORT" --no-access-log ;;
   shop)      exec uvicorn examples.demo_shop.app:app --host 0.0.0.0 --port "$SHOP_PORT" ;;
+  payments)  exec uvicorn examples.payment_gateway.app:app --host 0.0.0.0 --port "$PAYMENTS_PORT" ;;
   dashboard) exec python -m infrareplay.dashboard.app ;;
   all)       ;;
   *)
-    echo "unknown INFRAREPLAY_ROLE: $ROLE (api|shop|dashboard|all)" >&2
+    echo "unknown INFRAREPLAY_ROLE: $ROLE (api|shop|payments|dashboard|all)" >&2
     exit 64
     ;;
 esac
@@ -63,11 +70,14 @@ trap shutdown TERM INT
 start_api
 pids+=("$!")
 
+start_payments
+pids+=("$!")
+
 start_shop
 pids+=("$!")
 
-# Seeds the two fixture recordings once the API answers, so the dashboard
-# has something in it the moment it opens. INFRAREPLAY_SEED=0 turns it off.
+# Records real checkout traffic once the API and shop answer, so the
+# dashboard opens on real recordings. INFRAREPLAY_SEED=0 turns it off.
 python "$HERE/seed.py"
 
 start_dashboard
@@ -78,6 +88,8 @@ echo "InfraReplay is up:"
 echo "  dashboard  http://localhost:${DASHBOARD_PORT}"
 echo "  API        http://localhost:${API_PORT}        (/docs for OpenAPI)"
 echo "  demo shop  http://localhost:${SHOP_PORT}"
+echo "  payments   http://localhost:${PAYMENTS_PORT}/v1/charges   (the gateway's ledger)"
+echo "  TUI        docker exec -it <container> infractl tui"
 echo
 
 # Exit as soon as any one of them dies, so the container's status is honest.

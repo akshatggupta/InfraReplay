@@ -12,11 +12,13 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Checkbox, DataTable, Footer, Header, Input, Label, Static
 
+from infrareplay import config
 from infrareplay.tui import render
 from infrareplay.tui.client import Api, ApiError
 
 _BAR_CELLS = 26
-_MOCK = "mock"
+_RECORDED = "recorded"
+_LIVE = "live"
 
 # Cells the other columns take (#, glyph, took, cell padding), so the event
 # title can have whatever is left and the bars never scroll off-screen.
@@ -36,11 +38,15 @@ class ReplayDialog(ModalScreen[dict | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="dialog"):
             yield Label(f"Replay [b]{self._recording_id}[/b]", id="dialog-title")
-            yield Label("target — mock, or a live URL like http://127.0.0.1:3000", classes="hint")
-            yield Input(value=_MOCK, id="target")
+            yield Label("target — the live service to replay against", classes="hint")
+            yield Input(value=config.DEFAULT_TARGET, id="target")
             yield Label("concurrency — requests in flight at once; >1 reproduces races", classes="hint")
             yield Input(value="1", id="concurrency", type="integer")
             yield Checkbox("allow production-looking targets", id="unsafe")
+            yield Checkbox(
+                "really call external services (payments) — off: answered from the recording",
+                id="live-externals",
+            )
 
             with Horizontal(id="dialog-buttons"):
                 yield Button("Cancel", id="cancel")
@@ -54,11 +60,14 @@ class ReplayDialog(ModalScreen[dict | None]):
     def submit(self) -> None:
         concurrency = self.query_one("#concurrency", Input).value or "1"
 
+        live = self.query_one("#live-externals", Checkbox).value
+
         self.dismiss(
             {
-                "target": self.query_one("#target", Input).value.strip() or _MOCK,
+                "target": self.query_one("#target", Input).value.strip() or config.DEFAULT_TARGET,
                 "concurrency": max(int(concurrency), 1),
                 "unsafe": self.query_one("#unsafe", Checkbox).value,
+                "externals": _LIVE if live else _RECORDED,
             }
         )
 
@@ -190,7 +199,11 @@ class RecordingScreen(Screen):
 
         try:
             run = await self._api.replay(
-                self._recording_id, choice["target"], choice["concurrency"], choice["unsafe"]
+                self._recording_id,
+                choice["target"],
+                choice["concurrency"],
+                choice["unsafe"],
+                choice["externals"],
             )
         except ApiError as exc:
             self.notify(str(exc), title="Replay refused", severity="error", timeout=8)

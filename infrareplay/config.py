@@ -70,3 +70,19 @@ API_KEY = os.environ.get("INFRAREPLAY_API_KEY", "")
 # ----------------------------------------------------------- observability
 LOG_FORMAT = os.environ.get("INFRAREPLAY_LOG_FORMAT", "json")
 LOG_LEVEL = os.environ.get("INFRAREPLAY_LOG_LEVEL", "INFO").upper()
+
+
+# -------------------------------------------------------------------- demo
+#
+# The shop real demo traffic is recorded from, and what a replay targets when
+# the caller names none: the live shop, never the synthetic mock.
+DEMO_SHOP_URL = os.environ.get("INFRAREPLAY_DEMO_SHOP_URL", "http://127.0.0.1:3000")
+DEFAULT_TARGET = os.environ.get("INFRAREPLAY_DEFAULT_TARGET", DEMO_SHOP_URL)
+
+# Where benchmark/run.sh writes its reports (served at /api/benchmarks/latest).
+BENCHMARK_DIR = Path(
+    os.environ.get(
+        "INFRAREPLAY_BENCHMARK_DIR",
+        Path(__file__).resolve().parents[1] / "benchmark" / "results",
+    )
+)

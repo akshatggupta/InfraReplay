@@ -10,6 +10,7 @@ TILES = (
     ("failures", "infrareplay_replay_failures_total", {}),
     ("live captures", "infrareplay_active_captures", {}),
     ("refused", "infrareplay_auth_denied_total", {}),
+    ("dropped", "infrareplay_events_dropped_total", {}),
 )
 
 

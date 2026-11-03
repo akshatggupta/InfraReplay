@@ -83,15 +83,23 @@ class Api:
 
     # ----------------------------------------------------------------- writes
 
-    async def seed(self) -> list[dict]:
-        return await self._json("POST", "/api/demo/seed")
+    async def traffic(self, **options) -> dict:
+        """Record real checkouts through a live capture of the shop."""
 
-    async def replay(self, recording_id: str, target: str, concurrency: int, unsafe: bool) -> dict:
+        return await self._json("POST", "/api/demo/traffic", json=options)
+
+    async def benchmark(self) -> dict:
+        return await self._json("GET", "/api/benchmarks/latest")
+
+    async def replay(
+        self, recording_id: str, target: str, concurrency: int, unsafe: bool, externals: str
+    ) -> dict:
         body = {
             "recording_id": recording_id,
             "target": target,
             "concurrency": concurrency,
             "unsafe": unsafe,
+            "externals": externals,
         }
 
         return await self._json("POST", "/api/replays", json=body)

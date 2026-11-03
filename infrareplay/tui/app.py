@@ -11,6 +11,7 @@ renders and posts, and owns no logic of its own.
 
 from collections import deque
 
+from rich.console import Group
 from rich.table import Table
 from rich.text import Text
 from textual import on, work
@@ -65,8 +66,10 @@ class InfraReplayApp(App):
         Binding("3", "tab('captures')", "Captures", show=False),
         Binding("4", "tab('audit')", "Audit", show=False),
         Binding("5", "tab('plugins')", "Plugins", show=False),
+        Binding("6", "tab('benchmarks')", "Benchmarks", show=False),
         Binding("r", "refresh", "Refresh"),
-        Binding("s", "seed", "Seed demo"),
+        Binding("t", "traffic", "Record live traffic"),
+        Binding("o", "race", "Record oversell race"),
         Binding("x", "stop_capture", "Stop capture"),
     ]
 
@@ -92,7 +95,10 @@ class InfraReplayApp(App):
                 yield from self._overview()
 
             with TabPane("② Recordings", id="recordings"):
-                yield Label("enter open  ·  s seed demo data  ·  r refresh", classes="hint")
+                yield Label(
+                    "enter open  ·  t record live checkout traffic  ·  o record the oversell race  ·  r refresh",
+                    classes="hint",
+                )
                 yield _table("recordings-table", "recordings", "kind", "status", "title", "id", "target", "age")
 
             with TabPane("③ Captures", id="captures"):
@@ -105,6 +111,10 @@ class InfraReplayApp(App):
             with TabPane("⑤ Plugins", id="plugins"):
                 with VerticalScroll():
                     yield Static(id="plugins-view")
+
+            with TabPane("⑥ Benchmarks", id="benchmarks"):
+                with VerticalScroll():
+                    yield Static(id="benchmarks-view")
 
         yield Footer()
 
@@ -266,6 +276,8 @@ class InfraReplayApp(App):
             self.refresh_audit()
         elif tab == "plugins":
             self.refresh_plugins()
+        elif tab == "benchmarks":
+            self.refresh_benchmarks()
 
     @work(exclusive=True, group="recordings")
     async def refresh_recordings(self) -> None:
@@ -325,6 +337,18 @@ class InfraReplayApp(App):
 
         _fill_audit(self.query_one("#audit-table", DataTable), entries, with_target=True)
 
+    @work(exclusive=True, group="benchmarks")
+    async def refresh_benchmarks(self) -> None:
+        view = self.query_one("#benchmarks-view", Static)
+
+        try:
+            report = await self.api.benchmark()
+        except ApiError as exc:
+            view.update(Text(f"{exc}\n\nRun benchmark/run.sh to produce one.", style="#fbbf24"))
+            return
+
+        view.update(_benchmark_view(report))
+
     @work(exclusive=True, group="plugins")
     async def refresh_plugins(self) -> None:
         try:
@@ -344,15 +368,41 @@ class InfraReplayApp(App):
         self._refresh_tab(self.query_one(TabbedContent).active)
         self._tick()
 
-    @work(exclusive=True, group="seed")
-    async def action_seed(self) -> None:
+    def action_traffic(self) -> None:
+        self.record(
+            {"checkouts": 3, "declined": 1, "title": "Checkout — live traffic"},
+            "Three real checkouts, one declined card",
+        )
+
+    def action_race(self) -> None:
+        self.record(
+            {"checkouts": 2, "declined": 0, "concurrent": True, "stock": 1,
+             "title": "Checkout — oversell race"},
+            "Two shoppers, one unit, at the same moment",
+        )
+
+    @work(exclusive=True, group="traffic")
+    async def record(self, options: dict, what: str) -> None:
+        """Real traffic through a live capture of the shop — nothing synthetic."""
+
+        self.notify(f"{what}…", title="Recording")
+
         try:
-            seeded = await self.api.seed()
+            recording = await self.api.traffic(**options)
         except ApiError as exc:
-            self.notify(str(exc), severity="error")
+            self.notify(str(exc), title="Could not record", severity="error", timeout=8)
             return
 
-        self.notify(f"Seeded {len(seeded)} fixture recordings.", title="Demo data")
+        statuses = [
+            str(e["payload"].get("status"))
+            for e in recording["events"]
+            if e["event_type"] == "http.response" and e["payload"].get("direction") != render.OUTBOUND
+        ]
+        self.notify(
+            f"{len(recording['events'])} events · responses {', '.join(statuses)}",
+            title=f"Recorded {recording['recording_id']}",
+            timeout=8,
+        )
         self.action_tab("recordings")
         self.refresh_recordings()
 
@@ -479,6 +529,67 @@ def _mix_bar(counts: dict[str, float]) -> Text:
         legend.append(f"■ {name.lower()} {n:.0f}    ", style=color)
 
     return Text("\n").join([bar, legend])
+
+
+def _benchmark_view(report: dict) -> Group:
+    """What capture costs under load, from the latest benchmark/run.sh."""
+
+    m = report["machine"]
+    cost = Table(
+        title="what capture costs, per load level",
+        title_style="bold",
+        expand=True,
+        border_style=render.MUTED,
+    )
+
+    for column in ("load", "users", "throughput", "checkout p50", "p95", "complete", "dropped"):
+        cost.add_column(column, justify="left" if column == "load" else "right")
+
+    raw = Table(title="raw results", title_style="bold", expand=True, border_style=render.MUTED)
+
+    for column in ("load", "mode", "requests", "failures", "req/s", "checkout p50", "p95", "p99"):
+        raw.add_column(column, justify="left" if column in ("load", "mode") else "right")
+
+    for row in report["levels"]:
+        o, cap = row["overhead"], row["captured"]["capture"]
+        cost.add_row(
+            row["level"],
+            str(row["users"]),
+            _signed(o["throughput_change_pct"], "%"),
+            _signed(o["checkout_p50_added_ms"], " ms"),
+            _signed(o["checkout_p95_added_ms"], " ms"),
+            Text(f"{cap.get('completeness_pct') or 0:.1f}%", style="#34d399"),
+            Text(str(cap.get("events_dropped", "—")), style="#34d399" if not cap.get("events_dropped") else "#f87171"),
+        )
+
+        for mode in ("direct", "captured"):
+            agg = row[mode]["stats"].get("Aggregated", {})
+            chk = row[mode]["stats"].get("POST /api/v1/checkout", {})
+            raw.add_row(
+                row["level"], mode, f"{agg.get('requests', 0):,}", str(agg.get("failures", 0)),
+                str(agg.get("rps", 0)), _ms(chk.get("p50_ms")), _ms(chk.get("p95_ms")), _ms(chk.get("p99_ms")),
+            )
+
+    header = Text.assemble(
+        ("Latest run ", render.MUTED), (report["started_at"], "bold"),
+        ("  ·  ", render.MUTED), (m["cpu"], ""),
+        ("  ·  ", render.MUTED), (f"{m['logical_cores']} cores, {m['ram_gb']} GB", ""),
+        ("  ·  databases: ", render.MUTED),
+        (f"API {report['backend']['api_db']}, shop {report['backend']['shop_db']}", ""),
+    )
+
+    return Group(header, Text(), cost, Text(), raw)
+
+
+def _signed(value, unit: str) -> Text:
+    if value is None:
+        return Text("—", style=render.MUTED)
+
+    return Text(f"{value:+,.1f}{unit}")
+
+
+def _ms(value) -> str:
+    return "—" if value is None else f"{value:,.0f} ms"
 
 
 def _plugins_table(plugins: list[dict]) -> Table:

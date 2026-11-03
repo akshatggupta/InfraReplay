@@ -21,6 +21,7 @@ class AuditAction(str, Enum):
     RECORDING_EXPORT = "recording.export"
     RECORDING_IMPORT = "recording.import"
     DEMO_SEED = "demo.seed"
+    DEMO_TRAFFIC = "demo.traffic"
     AUTH_DENIED = "auth.denied"
 
 

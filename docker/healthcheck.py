@@ -14,13 +14,15 @@ _TIMEOUT_S = 3
 
 _API = f"http://127.0.0.1:{os.environ.get('INFRAREPLAY_API_PORT', '8000')}/health"
 _SHOP = f"http://127.0.0.1:{os.environ.get('DEMO_SHOP_PORT', '3000')}/health"
+_PAYMENTS = f"http://127.0.0.1:{os.environ.get('PAYMENT_GATEWAY_PORT', '4000')}/health"
 _DASHBOARD = f"http://127.0.0.1:{os.environ.get('INFRAREPLAY_DASHBOARD_PORT', '8080')}/"
 
 _URLS_BY_ROLE = {
     "api": [_API],
     "shop": [_SHOP],
+    "payments": [_PAYMENTS],
     "dashboard": [_DASHBOARD],
-    "all": [_API, _SHOP, _DASHBOARD],
+    "all": [_API, _PAYMENTS, _SHOP, _DASHBOARD],
 }
 
 

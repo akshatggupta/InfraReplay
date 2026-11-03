@@ -4,15 +4,19 @@ Routes are thin: parse the request, call a service, return the model. All
 business logic lives in `recording`, `replay`, and `comparison`.
 """
 
+import json
 from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from infrareplay import config, demo
+from infrareplay.capture.context import ExternalsMode
+from infrareplay.demo_traffic import record_traffic
 from infrareplay.capture import (
     CaptureError,
     active_sessions,
@@ -32,6 +36,7 @@ from infrareplay.plugins.registry import PluginError, get_registry
 from infrareplay.recording import (
     BundleError,
     export_recording,
+    list_externals,
     get_comparison,
     get_recording,
     import_recording,
@@ -57,6 +62,7 @@ from infrareplay.security import (
 _NOT_FOUND = 404
 _BAD_REQUEST = 400
 _UNAUTHORIZED = 401
+_BAD_GATEWAY = 502
 
 # Open without a key: liveness, scraping, and the API's own documentation.
 _PUBLIC_PATHS = frozenset(
@@ -94,7 +100,9 @@ class CaptureResponse(BaseModel):
 
 class ReplayRequest(BaseModel):
     recording_id: str
-    target: str = "mock"
+
+    # The live shop unless named; "mock" is the synthetic stand-in for tests.
+    target: str = Field(default_factory=lambda: config.DEFAULT_TARGET)
     unsafe: bool = False
     substitutions: dict[str, str] | None = None
 
@@ -103,6 +111,26 @@ class ReplayRequest(BaseModel):
 
     # Requests sent at once — set it to reproduce a race.
     concurrency: int = 1
+
+    # Outbound calls the target makes: answered from the recording (default)
+    # or, only when asked, really sent (v11).
+    externals: ExternalsMode = ExternalsMode.RECORDED
+
+
+class TrafficRequest(BaseModel):
+    """Real checkouts through a live capture of the shop — no fixtures."""
+
+    upstream: str = Field(default_factory=lambda: config.DEMO_SHOP_URL)
+    title: str = "Checkout — live traffic"
+    checkouts: int = Field(3, ge=1, le=50)
+
+    # How many of them use a card the gateway declines.
+    declined: int = Field(1, ge=0)
+    concurrent: bool = False
+
+    # Restock the shop first (every product), so ordinary traffic is not
+    # refused for lack of stock; 1 sets up the oversell race; null leaves it.
+    stock: int | None = 100
 
 
 class ReplayResponse(BaseModel):
@@ -216,6 +244,43 @@ def create_app() -> FastAPI:
     @app.get("/api/plugins")
     async def plugins() -> list[dict]:
         return get_registry().describe()
+
+    @app.post("/api/demo/traffic", response_model=Recording)
+    async def demo_traffic(req: TrafficRequest, request: Request) -> Recording:
+        """Record real checkout traffic: real HTTP, SQL and payment calls."""
+
+        try:
+            recording = await record_traffic(
+                upstream=req.upstream,
+                title=req.title,
+                checkouts=req.checkouts,
+                declined=min(req.declined, req.checkouts),
+                concurrent=req.concurrent,
+                stock=req.stock,
+            )
+        except (CaptureError, httpx.HTTPError) as exc:
+            raise HTTPException(_BAD_GATEWAY, f"could not drive the shop at {req.upstream}: {exc}")
+
+        await record(
+            AuditAction.DEMO_TRAFFIC,
+            actor=_actor(request),
+            recording_id=recording.recording_id,
+            target=req.upstream,
+            detail={"checkouts": req.checkouts, "events": len(recording.events)},
+        )
+
+        return recording
+
+    @app.get("/api/benchmarks/latest")
+    async def benchmark_latest() -> dict:
+        """The newest benchmark/run.sh report (v10), as its summary.json."""
+
+        summary = config.BENCHMARK_DIR / "latest" / "summary.json"
+
+        if not summary.exists():
+            raise HTTPException(_NOT_FOUND, "no benchmark report yet: run benchmark/run.sh")
+
+        return json.loads(summary.read_text())
 
     @app.post("/api/demo/seed", response_model=list[Recording])
     async def seed(request: Request) -> list[Recording]:
@@ -369,6 +434,12 @@ def create_app() -> FastAPI:
             "schema_version": recording.schema_version,
         }
 
+    @app.get("/api/recordings/{recording_id}/externals")
+    async def externals(recording_id: str, correlation_id: str) -> list[dict]:
+        """The outbound calls one recorded request made, for replay to answer from."""
+
+        return await list_externals(recording_id, correlation_id)
+
     @app.get("/api/projects")
     async def projects() -> list[dict]:
         return await list_projects()
@@ -396,6 +467,7 @@ def create_app() -> FastAPI:
         detail = {
             "unsafe": req.unsafe,
             "concurrency": req.concurrency,
+            "externals": req.externals.value,
             "substituted": sorted(req.substitutions or {}),
         }
 
@@ -407,6 +479,7 @@ def create_app() -> FastAPI:
                 substitutions=req.substitutions,
                 auto=auto,
                 concurrency=req.concurrency,
+                externals=req.externals,
             )
         except ReplayError as exc:
             await record(
