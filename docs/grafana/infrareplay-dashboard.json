@@ -383,7 +383,7 @@
     {
       "id": 8,
       "type": "timeseries",
-      "title": "Snapshot bytes written per second",
+      "title": "Snapshot bytes written, and capture losses",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -413,6 +413,15 @@
           },
           "expr": "rate(infrareplay_capture_errors_total[5m])",
           "legendFormat": "capture errors/s"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(infrareplay_events_dropped_total[5m])",
+          "legendFormat": "events dropped/s"
         }
       ],
       "fieldConfig": {

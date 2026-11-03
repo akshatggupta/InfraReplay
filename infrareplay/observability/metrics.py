@@ -57,6 +57,11 @@ CAPTURE_ERRORS = Counter(
     "Captures that ended in failure.",
 )
 
+EVENTS_DROPPED = Counter(
+    "infrareplay_events_dropped_total",
+    "Captured events that could not be stored after retries. Should stay 0.",
+)
+
 ACTIVE_CAPTURES = Gauge(
     "infrareplay_active_captures",
     "Live capture sessions right now.",

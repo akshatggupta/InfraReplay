@@ -4,10 +4,12 @@ Every CLI command and dashboard action reaches this through the API — there
 is exactly one code path that knows how to "start a recording".
 """
 
+import asyncio
 import json
 from uuid import uuid4
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import OperationalError
 
 from infrareplay import config
 
@@ -19,6 +21,7 @@ from infrareplay.recording.portable import build_bundle, parse_bundle, rekey
 from infrareplay.schema import (
     ComparisonResult,
     Event,
+    EventType,
     Recording,
     RecordingKind,
     RecordingStatus,
@@ -27,6 +30,11 @@ from infrareplay.schema import (
 _DEFAULT_REDACTION = "redaction_default"
 
 _log = get_logger(__name__)
+
+_OUTBOUND = "outbound"
+
+_WRITE_ATTEMPTS = 4
+_RETRY_BACKOFF_S = 0.2
 _SNAPSHOT_KEY = "recordings/{rid}/recording.json"
 
 
@@ -145,15 +153,23 @@ async def append_events(
     redactor = get_registry().redaction(_DEFAULT_REDACTION)()
     links = links or {}
 
-    stored: list[Event] = []
+    stored = [redactor.redact(event) for event in events]
 
-    async with get_session() as session:
-        for event in events:
-            clean = redactor.redact(event)
-            stored.append(clean)
-            session.add(_event_to_row(clean, source_event_id=links.get(clean.event_id)))
+    for attempt in range(_WRITE_ATTEMPTS):
+        try:
+            async with get_session() as session:
+                for clean in stored:
+                    session.add(_event_to_row(clean, source_event_id=links.get(clean.event_id)))
 
-        await session.commit()
+                await session.commit()
+            break
+
+        except OperationalError:
+            # A busy database is transient: back off and try the batch again.
+            if attempt == _WRITE_ATTEMPTS - 1:
+                raise
+
+            await asyncio.sleep(_RETRY_BACKOFF_S * (attempt + 1))
 
     for event in stored:
         metrics.EVENTS_CAPTURED.labels(event.event_type.value).inc()
@@ -341,6 +357,40 @@ async def import_recording(doc: dict) -> Recording:
     await append_events(recording.recording_id, recording.events)
 
     return await finish_recording(recording.recording_id)
+
+
+async def list_externals(recording_id: str, correlation_id: str) -> list[dict]:
+    """The outbound calls one request made, each with the answer it got (v11).
+
+    Ordered as they happened, so the Nth identical call on replay gets the
+    Nth recorded answer.
+    """
+
+    await init_db()
+
+    async with get_session() as session:
+        stmt = (
+            select(EventRow)
+            .where(
+                EventRow.recording_id == recording_id,
+                EventRow.correlation_id == correlation_id,
+            )
+            .order_by(EventRow.sequence)
+        )
+        rows = (await session.scalars(stmt)).all()
+
+    outbound = [r for r in rows if (r.payload or {}).get("direction") == _OUTBOUND]
+    answers = {r.parent_event_id: r for r in outbound if r.event_type == EventType.HTTP_RESPONSE.value}
+
+    return [
+        {
+            "key": r.payload.get("key"),
+            "request": r.payload,
+            "response": answers[r.event_id].payload,
+        }
+        for r in outbound
+        if r.event_type == EventType.HTTP_REQUEST.value and r.event_id in answers
+    ]
 
 
 async def list_projects() -> list[dict]:

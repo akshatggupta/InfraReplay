@@ -44,6 +44,11 @@ class HttpCapturePlugin(CapturePlugin):
 
         await self._queue.put(None)  # unblocks events()
 
+    def pending(self) -> int:
+        """Events queued but not yet yielded — lets the writer batch a burst."""
+
+        return self._queue.qsize()
+
     async def events(self) -> AsyncIterator[Event]:
         """Yield until stop() drops the sentinel in."""
 

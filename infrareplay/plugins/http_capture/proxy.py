@@ -33,6 +33,10 @@ _DROP_HEADERS = frozenset(
     {"host", "content-length", "connection", "transfer-encoding", "keep-alive"}
 )
 
+# The body is passed on already decompressed, so its encoding header must go
+# too — kept, it would tell the client to gunzip plain bytes.
+_DROP_RESPONSE_HEADERS = _DROP_HEADERS | {"content-encoding"}
+
 _JSON = "application/json"
 _STARTUP_POLL_S = 0.01
 _STARTUP_TIMEOUT_S = 10
@@ -59,10 +63,20 @@ class ReverseProxy:
         self._server: uvicorn.Server | None = None
         self._task: asyncio.Task | None = None
 
+        # One connection pool for the proxy's life. Building an httpx client
+        # per request cost 183 ms median (it loads a TLS bundle) and was most
+        # of capture's overhead in the v10 benchmark. A transport rather than
+        # a client: a client keeps a cookie jar, and a reverse proxy must never
+        # send one user's cookies on the next user's request.
+        self._transport: httpx.AsyncHTTPTransport | None = None
+        self._timeout = httpx.Timeout(config.CAPTURE_TIMEOUT_S).as_dict()
+
     # ------------------------------------------------------------- lifecycle
 
     async def serve(self, host: str, port: int) -> int:
         """Start listening. Returns the bound port (port 0 picks a free one)."""
+
+        self._transport = httpx.AsyncHTTPTransport()
 
         app = Starlette(routes=[Route("/{path:path}", self._handle, methods=_ALL_METHODS)])
         settings = uvicorn.Config(
@@ -83,8 +97,12 @@ class ReverseProxy:
         self._server.should_exit = True
         await self._task
 
+        if self._transport is not None:
+            await self._transport.aclose()
+
         self._server = None
         self._task = None
+        self._transport = None
 
     async def _await_startup(self) -> None:
         waited = 0.0
@@ -157,17 +175,27 @@ class ReverseProxy:
             RECORDING_HEADER: self._recording_id,
         }
 
-        async with httpx.AsyncClient(timeout=config.CAPTURE_TIMEOUT_S) as client:
+        upstream = httpx.Request(
+            request.method,
+            f"{self._upstream}{request.url.path}",
+            params=dict(request.query_params),
+            content=body or None,
+            headers=forwarded,
+            extensions={"timeout": self._timeout},
+        )
+
+        try:
+            response = await self._transport.handle_async_request(upstream)
+
             try:
-                return await client.request(
-                    request.method,
-                    f"{self._upstream}{request.url.path}",
-                    params=dict(request.query_params),
-                    content=body or None,
-                    headers=forwarded,
-                )
-            except httpx.RequestError as exc:
-                return exc
+                await response.aread()
+            finally:
+                await response.aclose()
+
+        except httpx.RequestError as exc:
+            return exc
+
+        return response
 
     # ----------------------------------------------------------------- events
 
@@ -236,7 +264,7 @@ def _client_response(upstream: httpx.Response | Exception) -> Response:
         return Response(f"upstream unreachable: {upstream}", status_code=_BAD_GATEWAY)
 
     headers = {
-        k: v for k, v in upstream.headers.items() if k.lower() not in _DROP_HEADERS
+        k: v for k, v in upstream.headers.items() if k.lower() not in _DROP_RESPONSE_HEADERS
     }
 
     return Response(

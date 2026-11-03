@@ -14,6 +14,8 @@ door for those, and the reason a recording row exists before any event does.
 
 import asyncio
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from infrareplay.contracts import CapturePlugin
 from infrareplay.observability import get_logger, metrics
 from infrareplay.plugins.registry import get_registry
@@ -52,6 +54,7 @@ class CaptureSession:
 
         self._plugin = plugin
         self._drain: asyncio.Task | None = None
+        self.dropped = 0
 
     def describe(self) -> dict:
         return {
@@ -80,8 +83,46 @@ class CaptureSession:
         return await finish_recording(self.recording_id)
 
     async def _pump(self) -> None:
+        """Write what the plugin captures, a transaction per burst, never dying.
+
+        Whatever is already queued goes into one batch, so a busy proxy
+        commits once per burst instead of once per event. A batch that still
+        fails after the retries is counted and logged as dropped — before
+        v10 one failed write ended the pump and the rest of the capture was
+        lost without a trace.
+        """
+
+        batch: list[Event] = []
+
         async for event in self._plugin.events():
-            await append_events(self.recording_id, [event])
+            batch.append(event)
+
+            if self._backlog():
+                continue
+
+            await self._write(batch)
+            batch = []
+
+        if batch:
+            await self._write(batch)
+
+    def _backlog(self) -> int:
+        pending = getattr(self._plugin, "pending", None)
+
+        return pending() if pending else 0
+
+    async def _write(self, batch: list[Event]) -> None:
+        try:
+            await append_events(self.recording_id, batch)
+        except SQLAlchemyError as exc:
+            self.dropped += len(batch)
+            metrics.EVENTS_DROPPED.inc(len(batch))
+            _log.error(
+                "capture.events_dropped",
+                recording_id=self.recording_id,
+                events=len(batch),
+                error=str(exc)[:300],
+            )
 
 
 _SESSIONS: dict[str, CaptureSession] = {}
