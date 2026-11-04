@@ -12,11 +12,13 @@ Two nets, applied everywhere in the payload:
         -> {"note": "retry with ***REDACTED***"}
 
 Shape matching cannot know every secret format; it catches the common ones
-that turn up in real traffic. Anything else needs its key on the list.
+that turn up in real traffic. Anything else needs its key on the list, or
+on INFRAREPLAY_REDACT_KEYS for names only one application uses.
 """
 
 import re
 
+from infrareplay import config
 from infrareplay.contracts import RedactionPlugin
 from infrareplay.schema import Event
 
@@ -44,6 +46,9 @@ _SECRET_SHAPES = (
     re.compile(r"\bBearer\s+[A-Za-z0-9\-._~+/]{16,}=*", re.IGNORECASE),
     re.compile(r"\beyJ[\w-]{4,}\.[\w-]{4,}\.[\w-]{4,}"),
     re.compile(r"\b(?:sk|pk|rk|tok)_(?:live|test)_[A-Za-z0-9]{6,}"),
+    # A card token, whatever key carries it: a shop forwards the customer's
+    # `token` to its gateway as `source`, `card`, `payment_method`, …
+    re.compile(r"\btok_[A-Za-z0-9_]{4,}"),
 )
 
 
@@ -69,7 +74,9 @@ class DefaultRedactionPlugin(RedactionPlugin):
         return value
 
     def _scrub_entry(self, key: str, value):
-        if key.lower() in _SENSITIVE_KEYS:
+        lowered = key.lower()
+
+        if lowered in _SENSITIVE_KEYS or lowered in config.REDACT_KEYS:
             return REDACTED
 
         return self._scrub(value)

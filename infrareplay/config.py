@@ -30,6 +30,13 @@ IGNORE_FIELDS = frozenset(
     f.strip() for f in os.environ.get("INFRAREPLAY_IGNORE_FIELDS", "").split(",") if f.strip()
 )
 
+# Payload keys masked before storage, on top of the built-in sensitive ones:
+# an application's own names for secrets. Comma-separated, matched
+# case-insensitively, e.g. INFRAREPLAY_REDACT_KEYS=source,card_ref
+REDACT_KEYS = frozenset(
+    k.strip().lower() for k in os.environ.get("INFRAREPLAY_REDACT_KEYS", "").split(",") if k.strip()
+)
+
 
 # ---------------------------------------------------------------- security
 #
