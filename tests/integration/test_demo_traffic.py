@@ -48,6 +48,16 @@ async def test_ordinary_traffic_restocks_first(stack):
     assert sorted(_client_statuses(recording)) == [_CONFIRMED, _CONFIRMED, _DECLINED]
 
 
+async def test_no_card_token_is_stored(stack):
+    # The demo cards travel twice: in the checkout (`token`) and in the shop's
+    # call to its gateway (`source`). Neither copy may reach storage.
+    api, shop = stack
+
+    recording = await _traffic(api, shop, checkouts=2, declined=1)
+
+    assert "tok_" not in str([e["payload"] for e in recording["events"]])
+
+
 async def test_a_declined_card_gives_its_stock_back(stack):
     _, shop = stack
     await reset_shop(shop, stock=5)

@@ -108,6 +108,31 @@ def test_secrets_inside_free_text_are_masked():
     assert out.payload["body"]["key"] == REDACTED
 
 
+def test_card_tokens_are_masked_by_shape_under_any_key():
+    # The shop sends the card to its gateway as `source`, a key no list flags;
+    # the token must still not be stored (found by the paper's evaluation).
+    outbound = _event(
+        EventType.HTTP_REQUEST,
+        {"direction": "outbound", "body": {"amount_cents": 4978, "source": "tok_visa_4242",
+                                           "fallback": ["tok_decline_insufficient_funds"]}},
+    )
+
+    out = DefaultRedactionPlugin().redact(outbound)
+
+    assert out.payload["body"] == {"amount_cents": 4978, "source": REDACTED, "fallback": [REDACTED]}
+
+
+def test_extra_sensitive_keys_come_from_config(monkeypatch):
+    # An application's own secret field names, for formats no shape catches.
+    monkeypatch.setattr(config, "REDACT_KEYS", frozenset({"source"}))
+
+    out = DefaultRedactionPlugin().redact(
+        _event(EventType.HTTP_REQUEST, {"body": {"Source": "card_8Hx2", "amount_cents": 100}})
+    )
+
+    assert out.payload["body"] == {"Source": REDACTED, "amount_cents": 100}
+
+
 def test_ordinary_text_is_left_alone():
     payload = {"body": {"note": "Bearer of good news", "ref": "pi_3Qx8Zk2eRfL0aQ"}}
 

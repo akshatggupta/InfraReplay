@@ -175,9 +175,12 @@ export INFRAREPLAY_API_KEYS="ci:$(openssl rand -hex 16)"   # server: require key
 export INFRAREPLAY_API_KEY="<that secret>"                  # clients: send one
 export INFRAREPLAY_STORAGE_PLUGIN=storage_encrypted          # encrypt snapshots at rest
 export INFRAREPLAY_ENCRYPTION_KEY="$(infractl security keygen)"
+export INFRAREPLAY_REDACT_KEYS=source,card_ref               # your app's own secret field names
 ```
 
 With no keys set the API is open — the dev default — and `/health` says so.
+Secrets are masked by key name and by shape (bearer tokens, JWTs, provider
+keys, `tok_…` card tokens) before anything is stored.
 
 ## CLI
 
